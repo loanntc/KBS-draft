@@ -1,0 +1,127 @@
+@import "tailwindcss";
+
+:root {
+  /* KB Securities Brand Colors */
+  --kb-yellow: #FFD700;
+  --kb-yellow-dark: #F5C400;
+  --kb-red: #E8003D;
+  --kb-blue: #0046BE;
+  --kb-gray-50: #F8F9FA;
+  --kb-gray-100: #F1F3F5;
+  --kb-gray-200: #E9ECEF;
+  --kb-gray-300: #DEE2E6;
+  --kb-gray-400: #CED4DA;
+  --kb-gray-500: #ADB5BD;
+  --kb-gray-600: #6C757D;
+  --kb-gray-700: #495057;
+  --kb-gray-800: #343A40;
+  --kb-gray-900: #212529;
+
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+  --color-kb-yellow: var(--kb-yellow);
+  --color-kb-red: var(--kb-red);
+  --color-kb-blue: var(--kb-blue);
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: 'Pretendard', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Mobile-first: constrain to phone width */
+.mobile-container {
+  max-width: 430px;
+  margin: 0 auto;
+  min-height: 100dvh;
+  background: #fff;
+  position: relative;
+  box-shadow: 0 0 40px rgba(0,0,0,0.08);
+}
+
+/* Bottom sheet overlay */
+.bottom-sheet-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.5);
+  z-index: 40;
+  animation: fadeIn 0.2s ease;
+}
+
+.bottom-sheet {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: #fff;
+  border-radius: 16px 16px 0 0;
+  z-index: 50;
+  animation: slideUp 0.25s ease;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes slideUp {
+  from { transform: translateX(-50%) translateY(100%); }
+  to { transform: translateX(-50%) translateY(0); }
+}
+
+/* Post card */
+.post-card {
+  background: #fff;
+  border-bottom: 1px solid var(--kb-gray-200);
+  padding: 16px;
+}
+
+/* Like button active state */
+.like-active {
+  color: var(--kb-red);
+}
+
+/* Scrap button active state */
+.scrap-active {
+  color: #FFB800;
+}
+
+/* Profit rate card colors — BR color coding */
+.pnl-positive { color: var(--kb-red); }    /* P&L > 0 = red (Korean convention) */
+.pnl-negative { color: var(--kb-blue); }   /* P&L < 0 = blue */
+.pnl-neutral  { color: var(--kb-gray-500); } /* P&L = 0 = grey */
+
+/* Scrollbar hide for carousel/horizontal scroll */
+.scrollbar-hide::-webkit-scrollbar { display: none; }
+.scrollbar-hide { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* Tab bar */
+.tab-bar {
+  position: fixed;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 100%;
+  max-width: 430px;
+  background: #fff;
+  border-top: 1px solid var(--kb-gray-200);
+  z-index: 30;
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+/* Safe top area for status bar */
+.safe-top {
+  padding-top: env(safe-area-inset-top);
+}
