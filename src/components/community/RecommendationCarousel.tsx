@@ -20,8 +20,7 @@ interface RecommendedPost {
   author: {
     id: string
     nickname: string
-    avatar_url: string | null
-    is_expert: boolean
+    profile_image: string | null
   } | null
 }
 
@@ -37,7 +36,7 @@ export default function RecommendationCarousel({ userId, nickname }: Recommendat
         .select(`
           id, body, like_count, comment_count, score,
           author:community_users!posts_author_id_fkey(
-            id, nickname, avatar_url, is_expert
+            id, nickname, profile_image
           )
         `)
         .eq('status', 'PUBLISHED')
@@ -96,9 +95,9 @@ export default function RecommendationCarousel({ userId, nickname }: Recommendat
             {/* Author */}
             <div className="flex items-center gap-2 mb-2">
               <div className="w-6 h-6 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                {post.author?.avatar_url ? (
+                {post.author?.profile_image ? (
                   <Image
-                    src={post.author.avatar_url}
+                    src={post.author.profile_image}
                     alt={post.author.nickname}
                     width={24}
                     height={24}
@@ -114,9 +113,6 @@ export default function RecommendationCarousel({ userId, nickname }: Recommendat
                 <span className="text-[10px] font-semibold text-gray-700 truncate">
                   {post.author?.nickname}
                 </span>
-                {post.author?.is_expert && (
-                  <span className="text-[8px] text-blue-600 bg-blue-50 px-1 rounded-full flex-shrink-0">전문가</span>
-                )}
               </div>
             </div>
 

@@ -2,11 +2,9 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname } from 'next/navigation'
-import {
-  Home, Users, Star, User,
-  Bell, Settings, Edit3
-} from 'lucide-react'
+import { Home, Users, Star, User, Bell, Settings, Edit3 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import PostComposer from '@/components/composer/PostComposer'
 
@@ -15,7 +13,7 @@ interface CommunityShellProps {
   currentUser: {
     id: string
     nickname: string
-    avatar_url: string | null
+    profileImage: string | null  // DB: profile_image
   }
 }
 
@@ -30,10 +28,8 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
   const pathname = usePathname()
   const [composerOpen, setComposerOpen] = useState(false)
 
-  const isActive = (href: string, exact: boolean) => {
-    if (exact) return pathname === href
-    return pathname.startsWith(href)
-  }
+  const isActive = (href: string, exact: boolean) =>
+    exact ? pathname === href : pathname.startsWith(href)
 
   return (
     <div className="mobile-container">
@@ -46,8 +42,6 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
           <div className="flex items-center gap-3">
             <Link href="/community/notifications" className="relative p-1">
               <Bell size={22} className="text-gray-700" />
-              {/* Unread badge — OI-14 */}
-              <span className="absolute -top-0.5 -right-0.5 w-2 h-2 bg-red-500 rounded-full" />
             </Link>
             <Link href="/community/settings" className="p-1">
               <Settings size={22} className="text-gray-700" />
@@ -57,15 +51,12 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
       </header>
 
       {/* ── Page Content ── */}
-      <main className="pb-24">
-        {children}
-      </main>
+      <main className="pb-24">{children}</main>
 
       {/* ── Floating Write Button ── */}
       <button
         onClick={() => setComposerOpen(true)}
         className="fixed z-30 bottom-20 right-4 flex items-center gap-2 bg-[#FFD700] text-gray-900 font-semibold text-sm px-4 py-3 rounded-full shadow-lg"
-        style={{ maxWidth: '430px' }}
       >
         <Edit3 size={16} />
         <span>글쓰기</span>
@@ -85,7 +76,16 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
                   active ? 'text-gray-900' : 'text-gray-400'
                 )}
               >
-                <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
+                {label === 'MY' && currentUser.profileImage ? (
+                  <div className={cn(
+                    'w-6 h-6 rounded-full overflow-hidden',
+                    active ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-300'
+                  )}>
+                    <Image src={currentUser.profileImage} alt="MY" width={24} height={24} className="w-full h-full object-cover" />
+                  </div>
+                ) : (
+                  <Icon size={22} strokeWidth={active ? 2.5 : 1.8} />
+                )}
                 <span>{label}</span>
               </Link>
             )
@@ -93,12 +93,8 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
         </div>
       </nav>
 
-      {/* ── Post Composer Bottom Sheet ── */}
       {composerOpen && (
-        <PostComposer
-          onClose={() => setComposerOpen(false)}
-          currentUser={currentUser}
-        />
+        <PostComposer onClose={() => setComposerOpen(false)} currentUser={currentUser} />
       )}
     </div>
   )

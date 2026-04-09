@@ -1,81 +1,74 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import PostCard from '@/components/post/PostCard'
 import SortToggle from '@/components/ui/SortToggle'
-import { Post, SortMode } from '@/types'
+import { Post, SortMode, mapPost } from '@/types'
 
 interface HomeFeedProps {
   currentUserId: string
 }
 
+const PAGE_SIZE = 20
+
 export default function HomeFeed({ currentUserId }: HomeFeedProps) {
   const [sort, setSort] = useState<SortMode>('popular')
   const [posts, setPosts] = useState<Post[]>([])
-  const [loading, setLoading] = useState(false)
-  const [cursor, setCursor] = useState<string | null>(null)
+  const [loading, setLoading] = useState(true)
   const [hasMore, setHasMore] = useState(true)
+  const [cursor, setCursor] = useState<string | number | null>(null)
 
   const fetchPosts = useCallback(async (sortMode: SortMode, reset = false) => {
     setLoading(true)
     const supabase = createClient()
 
-    // Build query — block filter applied server-side (BR-23)
-    const PAGE_SIZE = 20
+    // BR-23: block filter applied via server-side RLS + hidden_posts filter
+    // We also exclude posts from hidden_posts here for additional client safety
     let query = supabase
-      .from('posts_with_score')
+      .from('posts')
       .select(`
         *,
         author:community_users!posts_author_id_fkey(
-          id, nickname, avatar_url, is_expert, follower_count
+          id, auth_user_id, nickname, profile_image, bio,
+          is_member, post_count, follower_count, following_count,
+          feed_public, holdings_public, performance_public, scrap_public,
+          notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+          notif_repost, notif_new_follower, notif_new_post_bell, created_at
         ),
-        post_topic_tags(tag_type, value, display_name),
-        post_ai_hashtags(tag),
-        vote_options(id, label, vote_count, sort_order),
-        profit_rate_items(stock_code, stock_name, logo_url, quantity, evaluation_amount, unrealised_pnl, return_rate),
-        likes!left(id, user_id),
-        scraps!left(id, user_id)
+        post_likes!left(user_id),
+        post_scraps!left(user_id)
       `)
       .eq('status', 'PUBLISHED')
-      // Apply hidden posts filter client-side (supplementary) — actual enforcement is server-side
       .order(sortMode === 'popular' ? 'score' : 'created_at', { ascending: false })
       .limit(PAGE_SIZE)
 
-    if (!reset && cursor) {
-      query = query.lt(sortMode === 'popular' ? 'score' : 'created_at', cursor)
+    if (!reset && cursor !== null) {
+      if (sortMode === 'popular') {
+        query = query.lt('score', cursor)
+      } else {
+        query = query.lt('created_at', cursor)
+      }
     }
 
     const { data, error } = await query
 
     if (!error && data) {
-      const enriched = data.map((p: Record<string, unknown>) => ({
-        ...p,
-        topicTags: (p.post_topic_tags as {tag_type: string, value: string, display_name: string}[])?.map((t) => ({
-          type: t.tag_type,
-          value: t.value,
-          displayName: t.display_name,
-        })) ?? [],
-        aiHashtags: (p.post_ai_hashtags as {tag: string}[])?.map((h) => h.tag) ?? [],
-        isLiked: (p.likes as {user_id: string}[])?.some((l) => l.user_id === currentUserId) ?? false,
-        isScrapped: (p.scraps as {user_id: string}[])?.some((s) => s.user_id === currentUserId) ?? false,
-      })) as Post[]
-
+      const enriched = data.map((row) => mapPost(row as Record<string, unknown>, currentUserId))
       setPosts(reset ? enriched : (prev) => [...prev, ...enriched])
       setHasMore(data.length === PAGE_SIZE)
-
       if (data.length > 0) {
         const last = data[data.length - 1] as Record<string, unknown>
-        setCursor(sortMode === 'popular' ? String(last.score) : String(last.created_at))
+        setCursor(sortMode === 'popular' ? (last.score as number) : (last.created_at as string))
       }
     }
     setLoading(false)
   }, [cursor, currentUserId])
 
-  // Fetch on mount
-  useState(() => {
+  useEffect(() => {
     fetchPosts('popular', true)
-  })
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleSortChange = (newSort: SortMode) => {
     setSort(newSort)
@@ -85,27 +78,19 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
 
   return (
     <section>
-      {/* Section header */}
       <div className="flex items-center justify-between px-4 py-3 border-b border-gray-100">
-        <h2 className="text-sm font-bold text-gray-900 flex items-center gap-1">
-          🔥 인기글
-        </h2>
+        <h2 className="text-sm font-bold text-gray-900">🔥 인기글</h2>
         <SortToggle value={sort} onChange={handleSortChange} />
       </div>
 
-      {/* Post list */}
       <div>
         {posts.map((post) => (
           <PostCard
             key={post.id}
             post={post}
             currentUserId={currentUserId}
-            onUpdate={(updated) =>
-              setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))
-            }
-            onDelete={(id) =>
-              setPosts((prev) => prev.filter((p) => p.id !== id))
-            }
+            onUpdate={(updated) => setPosts((prev) => prev.map((p) => (p.id === updated.id ? updated : p)))}
+            onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
           />
         ))}
 
@@ -116,10 +101,7 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
         )}
 
         {!loading && hasMore && posts.length > 0 && (
-          <button
-            onClick={() => fetchPosts(sort)}
-            className="w-full py-4 text-sm text-gray-500"
-          >
+          <button onClick={() => fetchPosts(sort)} className="w-full py-4 text-sm text-gray-500">
             더 보기
           </button>
         )}

@@ -14,7 +14,7 @@ interface PostComposerProps {
   currentUser: {
     id: string
     nickname: string
-    avatar_url: string | null
+    profileImage: string | null
   }
 }
 
@@ -136,6 +136,27 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
     setPublishError(null)
 
     try {
+      // Build topic_tags as JSONB array (inline in posts table)
+      const topicTagsJson = topicTags.map((tag) => ({
+        type: 'theme',
+        value: tag,
+        displayName: tag,
+      }))
+
+      // Build vote_options as JSONB array (inline in posts table)
+      const voteOptionsJson = activeTab === 'VOTE'
+        ? voteOptions
+            .filter((o) => o.trim())
+            .map((label, i) => ({
+              id: crypto.randomUUID(),
+              label,
+              voteCount: 0,
+              percentage: 0,
+              isUserVote: false,
+              sortOrder: i,
+            }))
+        : null
+
       const postPayload: Record<string, unknown> = {
         author_id: currentUser.id,
         type: activeTab,
@@ -143,7 +164,11 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
         body: activeTab === 'TEXT' ? body.trim() : (body.trim() || null),
         images: activeTab === 'IMAGE' ? imageUrls.filter((u) => u.trim()) : null,
         link_url: activeTab === 'LINK' ? linkUrl.trim() : null,
-        repost_parent_id: activeTab === 'REPOST' ? repostId.trim() : null,
+        repost_of: activeTab === 'REPOST' ? repostId.trim() : null,
+        topic_tags: topicTagsJson,
+        ai_hashtags: aiHashtagEnabled ? [] : null,
+        vote_options: voteOptionsJson,
+        profit_rate_holdings: null,
         like_count: 0,
         comment_count: 0,
         repost_count: 0,
@@ -153,47 +178,14 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
         is_edited: false,
       }
 
-      const { data: post, error: postError } = await supabase
+      const { error: postError } = await supabase
         .from('posts')
         .insert(postPayload)
-        .select('id')
-        .single()
 
-      if (postError || !post) {
+      if (postError) {
         setPublishError('게시글 등록에 실패했어요. 다시 시도해주세요.')
         setPublishing(false)
         return
-      }
-
-      // Insert topic tags
-      if (topicTags.length > 0) {
-        await supabase.from('post_topic_tags').insert(
-          topicTags.map((tag) => ({
-            post_id: post.id,
-            tag_type: 'theme',
-            value: tag,
-            display_name: tag,
-          }))
-        )
-      }
-
-      // Insert vote options
-      if (activeTab === 'VOTE') {
-        const validOptions = voteOptions.filter((o) => o.trim())
-        await supabase.from('vote_options').insert(
-          validOptions.map((label, i) => ({
-            post_id: post.id,
-            label,
-            sort_order: i,
-            vote_count: 0,
-          }))
-        )
-      }
-
-      // AI hashtag placeholder — real AI generation would happen server-side
-      if (aiHashtagEnabled) {
-        // In production this would be a server action / edge function
-        // For now we insert an empty set — AI tags generated async
       }
 
       onClose()
@@ -255,9 +247,9 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
         {/* ── Author row ── */}
         <div className="flex items-center gap-3 px-4 py-3">
           <div className="w-9 h-9 rounded-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center flex-shrink-0 overflow-hidden">
-            {currentUser.avatar_url ? (
+            {currentUser.profileImage ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={currentUser.avatar_url} alt="" className="w-full h-full object-cover" />
+              <img src={currentUser.profileImage} alt="" className="w-full h-full object-cover" />
             ) : (
               <span className="text-sm font-bold text-white">{currentUser.nickname[0]?.toUpperCase()}</span>
             )}

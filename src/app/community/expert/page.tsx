@@ -11,20 +11,20 @@ export default async function ExpertPage() {
   const { data: communityUser } = await supabase
     .from('community_users')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('auth_user_id', user.id)
     .single()
 
   if (!communityUser) redirect('/community/join')
 
-  // Fetch expert accounts
+  // Fetch top accounts by follower count (is_expert field doesn't exist)
   const { data: experts } = await supabase
     .from('community_users')
-    .select('id, nickname, avatar_url, is_expert, follower_count, post_count, bio')
-    .eq('is_expert', true)
+    .select('id, nickname, profile_image, follower_count, post_count, bio')
     .order('follower_count', { ascending: false })
+    .neq('id', communityUser.id)
     .limit(50)
 
-  // TOP 5 expert leaderboard
+  // TOP 5 leaderboard
   const top5 = (experts ?? []).slice(0, 5)
 
   // Check which experts current user follows

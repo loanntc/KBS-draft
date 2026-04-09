@@ -11,7 +11,7 @@ export default async function FollowingPage() {
   const { data: communityUser } = await supabase
     .from('community_users')
     .select('id, nickname')
-    .eq('user_id', user.id)
+    .eq('auth_user_id', user.id)
     .single()
 
   if (!communityUser) redirect('/community/join')
@@ -20,9 +20,9 @@ export default async function FollowingPage() {
   const { data: following } = await supabase
     .from('follows')
     .select(`
-      followee_id, bell_enabled,
+      followee_id, bell_on,
       followee:community_users!follows_followee_id_fkey(
-        id, nickname, avatar_url, is_expert, post_count, follower_count
+        id, nickname, profile_image, post_count, follower_count
       )
     `)
     .eq('follower_id', communityUser.id)
@@ -31,7 +31,7 @@ export default async function FollowingPage() {
   // TOP 5 most followed accounts
   const { data: top5 } = await supabase
     .from('community_users')
-    .select('id, nickname, avatar_url, is_expert, follower_count, post_count')
+    .select('id, nickname, profile_image, follower_count, post_count')
     .order('follower_count', { ascending: false })
     .neq('id', communityUser.id)
     .limit(5)

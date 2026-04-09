@@ -121,15 +121,17 @@ export default function JoinPage() {
       }
 
       const { error } = await supabase.from('community_users').insert({
-        user_id: user.id,
+        auth_user_id: user.id,
         nickname,
-        avatar_url: avatarUrl,
+        profile_image: avatarUrl,
         avatar_gradient: PRESET_GRADIENTS[gradientIndex],
-        terms_service: terms.termsService,
-        privacy_consent: terms.privacyConsent,
-        notification_consent: terms.notificationConsent,
-        marketing_consent: terms.marketingConsent,
-        is_expert: false,
+        accepted_terms: {
+          termsService: terms.termsService,
+          privacyConsent: terms.privacyConsent,
+          notificationConsent: terms.notificationConsent,
+          marketingConsent: terms.marketingConsent,
+        },
+        is_member: true,
         post_count: 0,
         follower_count: 0,
         following_count: 0,

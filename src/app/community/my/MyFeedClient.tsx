@@ -9,12 +9,12 @@ import { createClient } from '@/lib/supabase/client'
 import { cn, formatFollowerCount } from '@/lib/utils'
 import PostCard from '@/components/post/PostCard'
 import SortToggle from '@/components/ui/SortToggle'
-import { Post, SortMode } from '@/types'
+import { Post, SortMode, mapPost } from '@/types'
 
 interface CommunityUserData {
   id: string
   nickname: string
-  avatar_url: string | null
+  profile_image: string | null
   bio: string | null
   post_count: number
   follower_count: number
@@ -54,14 +54,14 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
       .select(`
         *,
         author:community_users!posts_author_id_fkey(
-          id, nickname, avatar_url, is_expert, follower_count,
-          feed_public, holdings_public, performance_public, scrap_public, bio, post_count, following_count, created_at
+          id, auth_user_id, nickname, profile_image, bio,
+          is_member, post_count, follower_count, following_count,
+          feed_public, holdings_public, performance_public, scrap_public,
+          notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+          notif_repost, notif_new_follower, notif_new_post_bell, created_at
         ),
-        post_topic_tags(tag_type, value, display_name),
-        post_ai_hashtags(tag),
-        vote_options(id, label, vote_count, sort_order),
-        likes!left(id, user_id),
-        scraps!left(id, user_id)
+        post_likes!left(user_id),
+        post_scraps!left(user_id)
       `)
       .eq('author_id', communityUser.id)
       .neq('status', 'DELETED_BY_AUTHOR')
@@ -70,21 +70,8 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
       .limit(50)
 
     if (data) {
-      const enriched = data.map((p: Record<string, unknown>) => ({
-        ...p,
-        topicTags: (p.post_topic_tags as {tag_type: string; value: string; display_name: string}[] ?? []).map((t) => ({
-          type: t.tag_type,
-          value: t.value,
-          displayName: t.display_name,
-        })),
-        aiHashtags: (p.post_ai_hashtags as {tag: string}[] ?? []).map((h) => h.tag),
-        isLiked: (p.likes as {user_id: string}[] ?? []).some((l) => l.user_id === communityUser.id),
-        isScrapped: (p.scraps as {user_id: string}[] ?? []).some((s) => s.user_id === communityUser.id),
-        isHidden: false,
-        voteOptions: p.vote_options ?? null,
-        profitRateItems: null,
-      })) as Post[]
-      setPosts(enriched)
+      const mapped = data.map((row) => mapPost(row as Record<string, unknown>, communityUser.id))
+      setPosts(mapped)
     }
     setLoadingFeed(false)
   }, [communityUser.id, supabase])
@@ -92,19 +79,19 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
   const fetchScraps = useCallback(async () => {
     setLoadingScrap(true)
     const { data } = await supabase
-      .from('scraps')
+      .from('post_scraps')
       .select(`
         post_id,
-        post:posts!scraps_post_id_fkey(
+        post:posts!post_scraps_post_id_fkey(
           *,
           author:community_users!posts_author_id_fkey(
-            id, nickname, avatar_url, is_expert, follower_count,
-            feed_public, holdings_public, performance_public, scrap_public, bio, post_count, following_count, created_at
+            id, auth_user_id, nickname, profile_image, bio,
+            is_member, post_count, follower_count, following_count,
+            feed_public, holdings_public, performance_public, scrap_public,
+            notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+            notif_repost, notif_new_follower, notif_new_post_bell, created_at
           ),
-          post_topic_tags(tag_type, value, display_name),
-          post_ai_hashtags(tag),
-          vote_options(id, label, vote_count, sort_order),
-          likes!left(id, user_id)
+          post_likes!left(user_id)
         )
       `)
       .eq('user_id', communityUser.id)
@@ -112,27 +99,15 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
       .limit(50)
 
     if (data) {
-      const enriched = data
+      const mapped = data
         .map((row: Record<string, unknown>) => {
           const p = row.post as Record<string, unknown>
           if (!p) return null
-          return {
-            ...p,
-            topicTags: (p.post_topic_tags as {tag_type: string; value: string; display_name: string}[] ?? []).map((t) => ({
-              type: t.tag_type,
-              value: t.value,
-              displayName: t.display_name,
-            })),
-            aiHashtags: (p.post_ai_hashtags as {tag: string}[] ?? []).map((h) => h.tag),
-            isLiked: (p.likes as {user_id: string}[] ?? []).some((l) => l.user_id === communityUser.id),
-            isScrapped: true,
-            isHidden: false,
-            voteOptions: p.vote_options ?? null,
-            profitRateItems: null,
-          } as Post
+          const post = mapPost(p, communityUser.id)
+          return { ...post, isScrapped: true }
         })
         .filter(Boolean) as Post[]
-      setScrapPosts(enriched)
+      setScrapPosts(mapped)
     }
     setLoadingScrap(false)
   }, [communityUser.id, supabase])
@@ -182,9 +157,9 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
         <div className="flex items-start justify-between">
           <Link href="/community/settings/profile" className="relative">
             <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden">
-              {communityUser.avatar_url ? (
+              {communityUser.profile_image ? (
                 <Image
-                  src={communityUser.avatar_url}
+                  src={communityUser.profile_image}
                   alt={communityUser.nickname}
                   width={64}
                   height={64}

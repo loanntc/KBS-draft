@@ -9,22 +9,14 @@ export default async function CommunityHomePage() {
 
   const { data: communityUser } = await supabase
     .from('community_users')
-    .select('id, nickname, avatar_url')
-    .eq('user_id', user!.id)
+    .select('id, nickname')
+    .eq('auth_user_id', user!.id)
     .single()
 
   return (
     <div>
-      {/* §8.3 — Personalised Recommendation Carousel */}
-      <RecommendationCarousel
-        userId={communityUser!.id}
-        nickname={communityUser!.nickname}
-      />
-
-      {/* §8.4 — Theme Community Shortcuts */}
+      <RecommendationCarousel userId={communityUser!.id} nickname={communityUser!.nickname} />
       <ThemeShortcuts />
-
-      {/* §8.5 — Home Feed (인기글) */}
       <HomeFeed currentUserId={communityUser!.id} />
     </div>
   )

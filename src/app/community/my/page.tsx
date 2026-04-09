@@ -10,8 +10,8 @@ export default async function MyFeedPage() {
 
   const { data: communityUser } = await supabase
     .from('community_users')
-    .select('id, nickname, avatar_url, bio, post_count, follower_count, following_count, feed_public, scrap_public')
-    .eq('user_id', user.id)
+    .select('id, nickname, profile_image, bio, post_count, follower_count, following_count, feed_public, scrap_public')
+    .eq('auth_user_id', user.id)
     .single()
 
   if (!communityUser) redirect('/community/join')

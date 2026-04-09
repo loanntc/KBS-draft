@@ -33,9 +33,9 @@ export default function CommentSection({ postId, currentUserId }: CommentSection
       .select(`
         id, post_id, author_id, body, is_deleted, like_count, parent_comment_id, created_at,
         author:community_users!comments_author_id_fkey(
-          id, nickname, avatar_url, is_expert
+          id, nickname, profile_image
         ),
-        likes!left(id, user_id)
+        comment_likes!left(user_id)
       `)
       .eq('post_id', postId)
       .is('parent_comment_id', null)
@@ -50,22 +50,32 @@ export default function CommentSection({ postId, currentUserId }: CommentSection
             .select(`
               id, post_id, author_id, body, is_deleted, like_count, parent_comment_id, created_at,
               author:community_users!comments_author_id_fkey(
-                id, nickname, avatar_url, is_expert
+                id, nickname, profile_image
               ),
-              likes!left(id, user_id)
+              comment_likes!left(user_id)
             `)
             .eq('parent_comment_id', c.id as string)
             .order('created_at', { ascending: true })
+
+          const mapAuthor = (a: unknown): Comment['author'] => {
+            if (!a || typeof a !== 'object') return null
+            const row = a as Record<string, unknown>
+            return {
+              id: row.id as string,
+              nickname: row.nickname as string,
+              profileImage: (row.profile_image as string | null) ?? null,
+            }
+          }
 
           const replyList = (replies || []).map((r: Record<string, unknown>) => ({
             id: r.id as string,
             postId: r.post_id as string,
             authorId: r.author_id as string,
-            author: r.author as Comment['author'],
+            author: mapAuthor(r.author),
             body: r.body as string,
             isDeleted: r.is_deleted as boolean,
             likeCount: r.like_count as number,
-            isLiked: (r.likes as {user_id: string}[])?.some((l) => l.user_id === currentUserId) ?? false,
+            isLiked: (r.comment_likes as {user_id: string}[])?.some((l) => l.user_id === currentUserId) ?? false,
             parentCommentId: r.parent_comment_id as string,
             replies: [],
             replyCount: 0,
@@ -76,11 +86,11 @@ export default function CommentSection({ postId, currentUserId }: CommentSection
             id: c.id as string,
             postId: c.post_id as string,
             authorId: c.author_id as string,
-            author: c.author as Comment['author'],
+            author: mapAuthor(c.author),
             body: c.body as string,
             isDeleted: c.is_deleted as boolean,
             likeCount: c.like_count as number,
-            isLiked: (c.likes as {user_id: string}[])?.some((l) => l.user_id === currentUserId) ?? false,
+            isLiked: (c.comment_likes as {user_id: string}[])?.some((l) => l.user_id === currentUserId) ?? false,
             parentCommentId: null,
             replies: replyList,
             replyCount: replyList.length,
@@ -173,8 +183,8 @@ export default function CommentSection({ postId, currentUserId }: CommentSection
   // ── Avatar ─────────────────────────────────────────────────────────────────
   const Avatar = ({ user }: { user: Comment['author'] }) => (
     <div className="w-8 h-8 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-      {user?.avatarUrl ? (
-        <Image src={user.avatarUrl} alt={user.nickname} width={32} height={32} className="w-full h-full object-cover" />
+      {user?.profileImage ? (
+        <Image src={user.profileImage} alt={user.nickname} width={32} height={32} className="w-full h-full object-cover" />
       ) : (
         <div className="w-full h-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-xs font-bold text-white">
           {user?.nickname?.[0]?.toUpperCase()}
@@ -200,10 +210,7 @@ export default function CommentSection({ postId, currentUserId }: CommentSection
         <div className="flex-1 min-w-0">
           <div className="flex items-baseline gap-2">
             <span className="text-xs font-semibold text-gray-900">{comment.author?.nickname}</span>
-            {comment.author?.isExpert && (
-              <span className="text-[9px] font-medium text-blue-600 bg-blue-50 px-1 py-0.5 rounded-full">전문가</span>
-            )}
-            <span className="text-[10px] text-gray-400">{formatTimestamp(comment.createdAt)}</span>
+<span className="text-[10px] text-gray-400">{formatTimestamp(comment.createdAt)}</span>
           </div>
           <p className="text-sm text-gray-800 mt-0.5 leading-relaxed">{comment.body}</p>
           <div className="flex items-center gap-4 mt-1.5">

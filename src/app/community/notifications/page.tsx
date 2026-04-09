@@ -11,7 +11,7 @@ export default async function NotificationsPage() {
   const { data: communityUser } = await supabase
     .from('community_users')
     .select('id')
-    .eq('user_id', user.id)
+    .eq('auth_user_id', user.id)
     .single()
 
   if (!communityUser) redirect('/community/join')
@@ -21,8 +21,12 @@ export default async function NotificationsPage() {
     .from('notifications')
     .select(`
       id, type, is_read, post_id, comment_id, created_at,
-      actor:community_users!notifications_actor_id_fkey(
-        id, nickname, avatar_url, is_expert
+      sender:community_users!notifications_sender_id_fkey(
+        id, nickname, profile_image, created_at,
+        is_member, post_count, follower_count, following_count,
+        feed_public, holdings_public, performance_public, scrap_public,
+        notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+        notif_repost, notif_new_follower, notif_new_post_bell
       )
     `)
     .eq('recipient_id', communityUser.id)
@@ -36,11 +40,11 @@ export default async function NotificationsPage() {
     .eq('recipient_id', communityUser.id)
     .eq('is_read', false)
 
-  // Supabase returns joined single row as array — flatten actor field
+  // Supabase returns joined single row as array — flatten sender field
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const normalized = (notifications ?? []).map((n: any) => ({
     ...n,
-    actor: Array.isArray(n.actor) ? (n.actor[0] ?? null) : n.actor,
+    sender: Array.isArray(n.sender) ? (n.sender[0] ?? null) : n.sender,
   }))
 
   return (

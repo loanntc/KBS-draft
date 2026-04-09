@@ -7,20 +7,19 @@ import { Medal } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn, formatFollowerCount } from '@/lib/utils'
 import PostCard from '@/components/post/PostCard'
-import { Post } from '@/types'
+import { Post, mapPost } from '@/types'
 
 interface FollowUser {
   id: string
   nickname: string
-  avatar_url: string | null
-  is_expert: boolean
+  profile_image: string | null
   follower_count: number
   post_count: number
 }
 
 interface FollowEntry {
   followee_id: string
-  bell_enabled: boolean
+  bell_on: boolean
   followee: FollowUser | null
 }
 
@@ -61,14 +60,14 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
       .select(`
         *,
         author:community_users!posts_author_id_fkey(
-          id, nickname, avatar_url, is_expert, follower_count,
-          feed_public, holdings_public, performance_public, scrap_public, bio, post_count, following_count, created_at
+          id, auth_user_id, nickname, profile_image, bio,
+          is_member, post_count, follower_count, following_count,
+          feed_public, holdings_public, performance_public, scrap_public,
+          notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+          notif_repost, notif_new_follower, notif_new_post_bell, created_at
         ),
-        post_topic_tags(tag_type, value, display_name),
-        post_ai_hashtags(tag),
-        vote_options(id, label, vote_count, sort_order),
-        likes!left(id, user_id),
-        scraps!left(id, user_id)
+        post_likes!left(user_id),
+        post_scraps!left(user_id)
       `)
       .in('author_id', ids)
       .eq('status', 'PUBLISHED')
@@ -76,21 +75,8 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
       .limit(40)
 
     if (data) {
-      const enriched = data.map((p: Record<string, unknown>) => ({
-        ...p,
-        topicTags: (p.post_topic_tags as {tag_type: string; value: string; display_name: string}[] ?? []).map((t) => ({
-          type: t.tag_type,
-          value: t.value,
-          displayName: t.display_name,
-        })),
-        aiHashtags: (p.post_ai_hashtags as {tag: string}[] ?? []).map((h) => h.tag),
-        isLiked: (p.likes as {user_id: string}[] ?? []).some((l) => l.user_id === currentUserId),
-        isScrapped: (p.scraps as {user_id: string}[] ?? []).some((s) => s.user_id === currentUserId),
-        isHidden: false,
-        voteOptions: p.vote_options ?? null,
-        profitRateItems: null,
-      })) as Post[]
-      setPosts(enriched)
+      const mapped = data.map((row) => mapPost(row as Record<string, unknown>, currentUserId))
+      setPosts(mapped)
     }
     setLoading(false)
   }, [following, currentUserId, supabase])
@@ -108,7 +94,7 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
       await supabase.from('follows').insert({
         follower_id: currentUserId,
         followee_id: userId,
-        bell_enabled: false,
+        bell_on: false,
       })
       setFollowedIds((prev) => new Set(prev).add(userId))
     }
@@ -143,9 +129,9 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
                 >
                   <div className="relative">
                     <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-                      {followee.avatar_url ? (
+                      {followee.profile_image ? (
                         <Image
-                          src={followee.avatar_url}
+                          src={followee.profile_image}
                           alt={followee.nickname}
                           width={48}
                           height={48}
@@ -185,8 +171,8 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
 
               {/* Avatar */}
               <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                {u.avatar_url ? (
-                  <Image src={u.avatar_url} alt={u.nickname} width={36} height={36} className="w-full h-full object-cover" />
+                {u.profile_image ? (
+                  <Image src={u.profile_image} alt={u.nickname} width={36} height={36} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-xs font-bold text-white">
                     {u.nickname[0]?.toUpperCase()}
@@ -200,9 +186,6 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
                   <Link href={`/community/user/${u.id}`} className="text-sm font-semibold text-gray-900 truncate">
                     {u.nickname}
                   </Link>
-                  {u.is_expert && (
-                    <span className="text-[9px] text-blue-600 bg-blue-50 px-1 rounded-full flex-shrink-0">전문가</span>
-                  )}
                 </div>
                 <p className="text-xs text-gray-400">팔로워 {formatFollowerCount(u.follower_count)}</p>
               </div>

@@ -18,11 +18,10 @@ interface NotificationRow {
   post_id: string | null
   comment_id: string | null
   created_at: string
-  actor: {
+  sender: {
     id: string
     nickname: string
-    avatar_url: string | null
-    is_expert: boolean
+    profile_image: string | null
   } | null
 }
 
@@ -77,14 +76,14 @@ export default function NotificationsClient({ notifications, currentUserId }: No
   const [followedIds, setFollowedIds] = useState<Set<string>>(new Set())
   const grouped = groupByDate(notifications)
 
-  const handleFollow = async (actorId: string) => {
-    if (followedIds.has(actorId)) return
+  const handleFollow = async (senderId: string) => {
+    if (followedIds.has(senderId)) return
     await supabase.from('follows').insert({
       follower_id: currentUserId,
-      followee_id: actorId,
-      bell_enabled: false,
+      followee_id: senderId,
+      bell_on: false,
     })
-    setFollowedIds((prev) => new Set(prev).add(actorId))
+    setFollowedIds((prev) => new Set(prev).add(senderId))
   }
 
   if (notifications.length === 0) {
@@ -143,20 +142,20 @@ export default function NotificationsClient({ notifications, currentUserId }: No
                     !n.is_read && 'bg-yellow-50/40'
                   )}
                 >
-                  {/* Actor avatar */}
+                  {/* Sender avatar */}
                   <div className="relative flex-shrink-0">
                     <div className="w-10 h-10 rounded-full bg-gray-200 overflow-hidden">
-                      {n.actor?.avatar_url ? (
+                      {n.sender?.profile_image ? (
                         <Image
-                          src={n.actor.avatar_url}
-                          alt={n.actor.nickname ?? ''}
+                          src={n.sender.profile_image}
+                          alt={n.sender.nickname ?? ''}
                           width={40}
                           height={40}
                           className="w-full h-full object-cover"
                         />
                       ) : (
                         <div className="w-full h-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-sm font-bold text-white">
-                          {n.actor?.nickname?.[0]?.toUpperCase()}
+                          {n.sender?.nickname?.[0]?.toUpperCase()}
                         </div>
                       )}
                     </div>
@@ -172,10 +171,10 @@ export default function NotificationsClient({ notifications, currentUserId }: No
                   <div className="flex-1 min-w-0">
                     <p className="text-sm text-gray-800 leading-snug">
                       <Link
-                        href={`/community/user/${n.actor?.id}`}
+                        href={`/community/user/${n.sender?.id}`}
                         className="font-semibold hover:underline"
                       >
-                        {n.actor?.nickname}
+                        {n.sender?.nickname}
                       </Link>
                       {label}
                     </p>
@@ -186,18 +185,18 @@ export default function NotificationsClient({ notifications, currentUserId }: No
 
                   {/* Action buttons */}
                   <div className="flex-shrink-0">
-                    {isNewFollower && n.actor && (
+                    {isNewFollower && n.sender && (
                       <button
-                        onClick={() => handleFollow(n.actor!.id)}
-                        disabled={followedIds.has(n.actor!.id)}
+                        onClick={() => handleFollow(n.sender!.id)}
+                        disabled={followedIds.has(n.sender!.id)}
                         className={cn(
                           'text-xs font-semibold px-3 py-1.5 rounded-full border transition-all',
-                          followedIds.has(n.actor!.id)
+                          followedIds.has(n.sender!.id)
                             ? 'border-gray-200 text-gray-400 bg-gray-50'
                             : 'border-[#FFD700] text-gray-900 bg-[#FFD700]'
                         )}
                       >
-                        {followedIds.has(n.actor!.id) ? '팔로잉' : '팔로우'}
+                        {followedIds.has(n.sender!.id) ? '팔로잉' : '팔로우'}
                       </button>
                     )}
                     {!isNewFollower && hasPost && (

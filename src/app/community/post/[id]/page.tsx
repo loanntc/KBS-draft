@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound } from 'next/navigation'
-import { Post } from '@/types'
-import PostCard from '@/components/post/PostCard'
+import { mapPost } from '@/types'
 import CommentSection from '@/components/community/CommentSection'
 import PostDetailClient from './PostDetailClient'
 
@@ -24,8 +23,8 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
 
   const { data: communityUser } = await supabase
     .from('community_users')
-    .select('id, nickname, avatar_url')
-    .eq('user_id', user.id)
+    .select('id, nickname, profile_image')
+    .eq('auth_user_id', user.id)
     .single()
 
   const { data: rawPost, error } = await supabase
@@ -33,16 +32,14 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
     .select(`
       *,
       author:community_users!posts_author_id_fkey(
-        id, nickname, avatar_url, is_expert, follower_count,
+        id, auth_user_id, nickname, profile_image, bio,
+        is_member, post_count, follower_count, following_count,
         feed_public, holdings_public, performance_public, scrap_public,
-        bio, post_count, following_count, created_at
+        notif_like, notif_comment, notif_post_mention, notif_comment_mention,
+        notif_repost, notif_new_follower, notif_new_post_bell, created_at
       ),
-      post_topic_tags(tag_type, value, display_name),
-      post_ai_hashtags(tag),
-      vote_options(id, label, vote_count, sort_order),
-      profit_rate_items(stock_code, stock_name, logo_url, quantity, evaluation_amount, unrealised_pnl, return_rate),
-      likes!left(id, user_id),
-      scraps!left(id, user_id)
+      post_likes!left(user_id),
+      post_scraps!left(user_id)
     `)
     .eq('id', id)
     .single()
@@ -52,21 +49,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
   }
 
   const currentUserId = communityUser?.id ?? ''
-
-  const post: Post = {
-    ...rawPost,
-    topicTags: (rawPost.post_topic_tags ?? []).map((t: { tag_type: string; value: string; display_name: string }) => ({
-      type: t.tag_type,
-      value: t.value,
-      displayName: t.display_name,
-    })),
-    aiHashtags: (rawPost.post_ai_hashtags ?? []).map((h: { tag: string }) => h.tag),
-    isLiked: (rawPost.likes ?? []).some((l: { user_id: string }) => l.user_id === currentUserId),
-    isScrapped: (rawPost.scraps ?? []).some((s: { user_id: string }) => s.user_id === currentUserId),
-    voteOptions: rawPost.vote_options ?? null,
-    profitRateItems: rawPost.profit_rate_items ?? null,
-    isHidden: false,
-  }
+  const post = mapPost(rawPost as Record<string, unknown>, currentUserId)
 
   return (
     <div className="min-h-screen bg-white max-w-[430px] mx-auto flex flex-col">
