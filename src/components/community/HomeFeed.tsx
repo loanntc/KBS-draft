@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
+import { getBlockedAuthorIds, applyBlockFilter } from '@/lib/supabase/feedHelpers'
 import PostCard from '@/components/post/PostCard'
 import SortToggle from '@/components/ui/SortToggle'
 import { Post, SortMode, mapPost } from '@/types'
@@ -23,8 +24,9 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
     setLoading(true)
     const supabase = createClient()
 
-    // BR-23: block filter applied via server-side RLS + hidden_posts filter
-    // We also exclude posts from hidden_posts here for additional client safety
+    // BR-M02-005: block exclusion — bidirectional (G-09)
+    const blockedIds = await getBlockedAuthorIds(supabase, currentUserId)
+
     let query = supabase
       .from('posts')
       .select(`
@@ -40,12 +42,16 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
         post_scraps!left(user_id)
       `)
       .eq('status', 'PUBLISHED')
-      .order(sortMode === 'popular' ? 'score' : 'created_at', { ascending: false })
+      .eq('is_deleted', false)   // BE §2.2: Normal = PUBLISHED + not deleted
+      .order(sortMode === 'popular' ? 'like_count' : 'created_at', { ascending: false })
       .limit(PAGE_SIZE)
+
+    // Apply block filter (BR-M02-005)
+    query = applyBlockFilter(query, blockedIds)
 
     if (!reset && cursor !== null) {
       if (sortMode === 'popular') {
-        query = query.lt('score', cursor)
+        query = query.lt('like_count', cursor)
       } else {
         query = query.lt('created_at', cursor)
       }
@@ -59,7 +65,7 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
       setHasMore(data.length === PAGE_SIZE)
       if (data.length > 0) {
         const last = data[data.length - 1] as Record<string, unknown>
-        setCursor(sortMode === 'popular' ? (last.score as number) : (last.created_at as string))
+        setCursor(sortMode === 'popular' ? (last.like_count as number) : (last.created_at as string))
       }
     }
     setLoading(false)
