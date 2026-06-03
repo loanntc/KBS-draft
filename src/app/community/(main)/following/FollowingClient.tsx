@@ -65,15 +65,15 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
     }
 
     const { data } = await supabase
-      .from('posts')
+      .from('community_posts')
       .select(`
         *,
-        author:community_users!posts_author_id_fkey(
-          id, auth_user_id, nickname, profile_image, bio,
-          is_member, post_count, follower_count, following_count,
-          feed_public, holdings_public, performance_public, scrap_public,
+        author:community_members!community_posts_author_id_fkey(
+          id, user_id, nickname, avatar_url, bio,
+          is_expert, account_type, account_badge, post_count, follower_count, following_count,
+          feed_visibility, holdings_public, performance_public, scrap_public,
           notif_like, notif_comment, notif_post_mention, notif_comment_mention,
-          notif_repost, notif_new_follower, notif_new_post_bell, created_at
+          notif_repost, notif_new_follower, notif_new_post, created_at
         ),
         post_likes!left(user_id),
         post_scraps!left(user_id)

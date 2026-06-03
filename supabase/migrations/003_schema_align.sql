@@ -238,3 +238,46 @@ CREATE POLICY "blocks_manage_own" ON blocks FOR ALL
 DROP POLICY IF EXISTS "notifications_own" ON notifications;
 CREATE POLICY "notifications_own" ON notifications FOR ALL
   USING (recipient_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+
+-- ─── 9. Upgrade RLS policies created in 002 (replace auth.uid() IS NOT NULL stubs)
+-- 002 used simplified policies to avoid forward-referencing community_members before rename.
+-- Now that community_members exists, upgrade to proper member-check policies.
+
+-- Attachment tables
+DROP POLICY IF EXISTS "post_image_read"             ON post_image_attachments;
+DROP POLICY IF EXISTS "post_url_link_read"          ON post_url_link_attachments;
+DROP POLICY IF EXISTS "post_youtube_read"           ON post_youtube_link_attachments;
+DROP POLICY IF EXISTS "post_repost_read"            ON post_repost_attachments;
+DROP POLICY IF EXISTS "post_return_rate_read"       ON post_return_rate_attachments;
+DROP POLICY IF EXISTS "post_return_rate_items_read" ON post_return_rate_items;
+
+CREATE POLICY "post_image_read"             ON post_image_attachments         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_url_link_read"          ON post_url_link_attachments       FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_youtube_read"           ON post_youtube_link_attachments   FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_repost_read"            ON post_repost_attachments         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_return_rate_read"       ON post_return_rate_attachments    FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_return_rate_items_read" ON post_return_rate_items          FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+
+-- Poll tables
+DROP POLICY IF EXISTS "post_polls_read"        ON post_polls;
+DROP POLICY IF EXISTS "post_poll_options_read" ON post_poll_options;
+DROP POLICY IF EXISTS "poll_votes_read"        ON poll_votes;
+DROP POLICY IF EXISTS "poll_votes_manage_own"  ON poll_votes;
+
+CREATE POLICY "post_polls_read"        ON post_polls        FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "post_poll_options_read" ON post_poll_options  FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "poll_votes_read"        ON poll_votes         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "poll_votes_manage_own"  ON poll_votes         FOR ALL    USING (voter_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+
+-- AI tables
+DROP POLICY IF EXISTS "ai_debates_read"        ON ai_investment_debates;
+DROP POLICY IF EXISTS "debate_votes_read"       ON debate_votes;
+DROP POLICY IF EXISTS "debate_votes_manage_own" ON debate_votes;
+DROP POLICY IF EXISTS "post_ai_qa_read"         ON post_ai_qa;
+DROP POLICY IF EXISTS "ai_qa_interactions_own"  ON ai_qa_interactions;
+
+CREATE POLICY "ai_debates_read"        ON ai_investment_debates FOR SELECT USING (status IN ('ACTIVE','PAST') AND EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "debate_votes_read"      ON debate_votes          FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "debate_votes_manage_own" ON debate_votes         FOR ALL    USING (voter_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+CREATE POLICY "post_ai_qa_read"        ON post_ai_qa            FOR SELECT USING (status = 'COMPLETE' AND EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+CREATE POLICY "ai_qa_interactions_own" ON ai_qa_interactions    FOR ALL    USING (user_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));

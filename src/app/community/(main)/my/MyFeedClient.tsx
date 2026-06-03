@@ -14,12 +14,12 @@ import { Post, SortMode, mapPost } from '@/types'
 interface CommunityUserData {
   id: string
   nickname: string
-  profile_image: string | null
+  avatar_url: string | null
   bio: string | null
   post_count: number
   follower_count: number
   following_count: number
-  feed_public: boolean
+  feed_visibility: 'PUBLIC' | 'PRIVATE'
   scrap_public: boolean
 }
 
@@ -40,7 +40,7 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
 
   const [activeTab, setActiveTab] = useState<TabId>('feed')
   const [sort, setSort] = useState<SortMode>('latest')
-  const [feedPublic, setFeedPublic] = useState(communityUser.feed_public)
+  const [feedPublic, setFeedPublic] = useState(communityUser.feed_visibility === 'PUBLIC')
   const [posts, setPosts] = useState<Post[]>([])
   const [scrapPosts, setScrapPosts] = useState<Post[]>([])
   const [loadingFeed, setLoadingFeed] = useState(false)
@@ -49,22 +49,23 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
   const fetchMyPosts = useCallback(async (sortMode: SortMode) => {
     setLoadingFeed(true)
     const { data } = await supabase
-      .from('posts')
+      .from('community_posts')
       .select(`
         *,
-        author:community_users!posts_author_id_fkey(
-          id, auth_user_id, nickname, profile_image, bio,
-          is_member, post_count, follower_count, following_count,
-          feed_public, holdings_public, performance_public, scrap_public,
+        author:community_members!community_posts_author_id_fkey(
+          id, user_id, nickname, avatar_url, bio,
+          is_expert, account_type, account_badge, post_count, follower_count, following_count,
+          feed_visibility, holdings_public, performance_public, scrap_public,
           notif_like, notif_comment, notif_post_mention, notif_comment_mention,
-          notif_repost, notif_new_follower, notif_new_post_bell, created_at
+          notif_repost, notif_new_follower, notif_new_post, created_at
         ),
         post_likes!left(user_id),
         post_scraps!left(user_id)
       `)
       .eq('author_id', communityUser.id)
-      .eq('is_deleted', false)   // BE §2.2: show Normal+Hidden+Draft; exclude Deleted
-      .order(sortMode === 'popular' ? 'like_count' : 'created_at', { ascending: false })
+      .eq('is_deleted', false)
+      .in('status', ['PUBLISHED', 'HIDDEN'])   // MY tab: author sees own published + hidden posts; not drafts (per spec §4.1 MY tab filter)
+      .order(sortMode === 'popular' ? 'popularity_score' : 'created_at', { ascending: false })
       .limit(50)
 
     if (data) {
@@ -84,14 +85,14 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
       .from('post_scraps')
       .select(`
         post_id,
-        post:posts!post_scraps_post_id_fkey(
+        post:community_posts!post_scraps_post_id_fkey(
           *,
-          author:community_users!posts_author_id_fkey(
-            id, auth_user_id, nickname, profile_image, bio,
-            is_member, post_count, follower_count, following_count,
-            feed_public, holdings_public, performance_public, scrap_public,
+          author:community_members!community_posts_author_id_fkey(
+            id, user_id, nickname, avatar_url, bio,
+            is_expert, account_type, account_badge, post_count, follower_count, following_count,
+            feed_visibility, holdings_public, performance_public, scrap_public,
             notif_like, notif_comment, notif_post_mention, notif_comment_mention,
-            notif_repost, notif_new_follower, notif_new_post_bell, created_at
+            notif_repost, notif_new_follower, notif_new_post, created_at
           ),
           post_likes!left(user_id)
         )

@@ -42,6 +42,7 @@ export default async function PostDetailPage({ params }: PostDetailPageProps) {
       post_scraps!left(user_id)
     `)
     .eq('id', id)
+    .eq('is_deleted', false)  // BE §2.2: Deleted posts inaccessible to everyone
     .single()
 
   if (error || !rawPost) {

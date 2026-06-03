@@ -157,10 +157,16 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
             }))
         : null
 
+      // CR-41b: has_multiple_attachments = true when 2+ non-TEXT attachment types
+      // For now, each tab is a single type; multi-attachment support is a future enhancement
+      const hasMultipleAttachments = false
+
       const postPayload: Record<string, unknown> = {
         author_id: currentUser.id,
         type: activeTab,
         status: 'PUBLISHED',
+        is_deleted: false,
+        has_multiple_attachments: hasMultipleAttachments,
         body: activeTab === 'TEXT' ? body.trim() : (body.trim() || null),
         images: activeTab === 'IMAGE' ? imageUrls.filter((u) => u.trim()) : null,
         link_url: activeTab === 'LINK' ? linkUrl.trim() : null,
@@ -221,7 +227,7 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
                 : 'bg-gray-100 text-gray-400 cursor-not-allowed'
             )}
           >
-            {publishing ? '등록 중...' : '게시'}
+            {publishing ? '등록 중...' : '글 올리기'}
           </button>
         </div>
 
@@ -510,10 +516,9 @@ export default function PostComposer({ onClose, currentUser }: PostComposerProps
             <div className="flex justify-center mb-4">
               <div className="w-10 h-1 rounded-full bg-gray-200" />
             </div>
-            <h3 className="text-base font-bold text-gray-900 mb-1">작성 중인 내용이 있어요</h3>
+            <h3 className="text-base font-bold text-gray-900 mb-1">글쓰기를 중단할까요?</h3>
             <p className="text-sm text-gray-500 mb-5">
-              지금 나가면 작성 중인 게시글이 삭제됩니다.<br />
-              정말 나가시겠어요?
+              지금까지 쓴 내용은 저장되지 않아요.
             </p>
             <div className="flex gap-3">
               <button

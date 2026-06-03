@@ -1,6 +1,6 @@
 // ─── Enums ────────────────────────────────────────────────────────────────────
 
-export type PostStatus = 'PUBLISHED' | 'UNDER_REVIEW' | 'DELETED_BY_AUTHOR' | 'DELETED_BY_ADMIN'
+export type PostStatus = 'PUBLISHED' | 'HIDDEN' | 'DRAFT'
 export type PostType = 'TEXT' | 'IMAGE' | 'VOTE' | 'PROFIT_RATE' | 'LINK' | 'REPOST'
 export type NotificationType = 'N1_LIKE' | 'N2_COMMENT' | 'N3_POST_MENTION' | 'N4_COMMENT_MENTION' | 'N5_REPOST' | 'N6_NEW_FOLLOWER' | 'N7_NEW_POST'
 export type ThemeCommunityId = 'us-stocks' | 'kr-stocks' | 'asset-growth' | 'prime-club'
@@ -95,6 +95,9 @@ export interface Post {
   author: CommunityUser | null
   type: PostType
   status: PostStatus
+  is_deleted: boolean              // DB: is_deleted
+  title: string | null             // DB: title (optional; CR-2)
+  has_multiple_attachments: boolean // DB: has_multiple_attachments (2+ non-TEXT types; CR-41b)
   body: string | null
   images: string[] | null              // DB: images (jsonb)
   voteOptions: VoteOption[] | null     // DB: vote_options (jsonb)
@@ -309,6 +312,9 @@ export function mapPost(
     author,
     type: row.type as PostType,
     status: row.status as PostStatus,
+    is_deleted: (row.is_deleted as boolean) ?? false,
+    title: (row.title as string | null) ?? null,
+    has_multiple_attachments: (row.has_multiple_attachments as boolean) ?? false,
     body: (row.body as string | null) ?? null,
     images: (row.images as string[] | null) ?? null,
     voteOptions: voteOptionsRaw,

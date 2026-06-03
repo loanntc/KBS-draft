@@ -97,7 +97,7 @@ export default function CommunityShell({ children, currentUser }: CommunityShell
                   active ? 'text-gray-900' : 'text-gray-400'
                 )}
               >
-                {label === 'MY' && currentUser.profileImage ? (
+                {label === '내 피드' && currentUser.profileImage ? (
                   <div className={cn(
                     'w-6 h-6 rounded-full overflow-hidden',
                     active ? 'ring-2 ring-gray-900' : 'ring-1 ring-gray-300'

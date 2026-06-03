@@ -148,8 +148,25 @@ function ProfitRateContent({ post }: { post: Post }) {
   const items = post.profitRateHoldings ?? []
   if (!items.length) return null
 
+  // BR-12: show frozen snapshot timestamp ("mm월 dd일 hh:mm 기준")
+  const snapshotAt = items[0]?.snapshotAt
+  const snapshotLabel = snapshotAt
+    ? (() => {
+        const d = new Date(snapshotAt)
+        const mo = d.getMonth() + 1
+        const day = d.getDate()
+        const hh = String(d.getHours()).padStart(2, '0')
+        const mm = String(d.getMinutes()).padStart(2, '0')
+        return `${mo}월 ${day}일 ${hh}:${mm} 기준`
+      })()
+    : null
+
   return (
     <div className="mb-3">
+      {/* BR-12: snapshot timestamp */}
+      {snapshotLabel && (
+        <p className="text-[10px] text-gray-400 text-right mb-1">{snapshotLabel}</p>
+      )}
       {/* FR-6.4.1 — Always-visible compliance disclaimer */}
       <p className="text-[10px] text-orange-600 bg-orange-50 px-2 py-1.5 rounded mb-2">
         투자 성과는 개인의 과거 실적이며, 미래 수익을 보장하지 않습니다.
@@ -229,9 +246,8 @@ function RepostContent({ post }: { post: Post }) {
   // If no resolved parent but we have the ID, show placeholder
   if (!parent && !post.repostOf) return null
 
-  const isDeleted = parent
-    ? (parent.status === 'DELETED_BY_AUTHOR' || parent.status === 'DELETED_BY_ADMIN')
-    : true
+  // BE §2.2: Deleted = is_deleted=true (regardless of status value)
+  const isDeleted = parent ? parent.is_deleted : true
 
   return (
     <div className="rounded-lg border border-gray-200 bg-gray-50 p-3 mb-3">

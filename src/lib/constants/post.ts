@@ -1,30 +1,35 @@
 /**
- * Post status constants — aligned with `post_status` SQL enum in 001_community_schema.sql
- * Always use these constants instead of hardcoded strings.
+ * Post status constants — aligned with `post_status` SQL enum (003_schema_align.sql final state)
+ * Values: DRAFT | PUBLISHED | HIDDEN
+ * Deletion is tracked by `is_deleted BOOLEAN`, not by status.
  */
 export const POST_STATUS = {
-  PUBLISHED:        'PUBLISHED',
-  UNDER_REVIEW:     'UNDER_REVIEW',     // auto-set at 3 distinct reports (BR-07)
-  DELETED_BY_AUTHOR: 'DELETED_BY_AUTHOR',
-  DELETED_BY_ADMIN:  'DELETED_BY_ADMIN',
+  DRAFT:     'DRAFT',      // Saved, not published — author-only visibility
+  PUBLISHED: 'PUBLISHED',  // Live and visible to all community members
+  HIDDEN:    'HIDDEN',     // Auto-hidden on 3rd distinct report or Admin action
 } as const
 
 export type PostStatus = typeof POST_STATUS[keyof typeof POST_STATUS]
 
+/** Returns true if the post is visible in public feeds */
+export const isPubliclyVisible = (status: PostStatus): boolean =>
+  status === POST_STATUS.PUBLISHED
+
+/** Returns true if the post is hidden (under review) */
+export const isHidden = (status: PostStatus): boolean =>
+  status === POST_STATUS.HIDDEN
+
+/** Returns true if the post is a draft (not published) */
+export const isDraft = (status: PostStatus): boolean =>
+  status === POST_STATUS.DRAFT
+
 /**
- * Deleted statuses — a post is "deleted" if its status is one of these.
- * Use this instead of checking is_deleted (which may not exist on older rows).
+ * Deletion is tracked by the `is_deleted` BOOLEAN field on community_posts,
+ * NOT by a status value. Use the `is_deleted` column directly in queries.
+ *
+ * Per spec:
+ *  - Normal:  status = PUBLISHED, is_deleted = false
+ *  - Hidden:  status = HIDDEN,    is_deleted = false
+ *  - Draft:   status = DRAFT,     is_deleted = false
+ *  - Deleted: any status,         is_deleted = true (inaccessible to everyone)
  */
-export const DELETED_STATUSES: PostStatus[] = [
-  POST_STATUS.DELETED_BY_AUTHOR,
-  POST_STATUS.DELETED_BY_ADMIN,
-]
-
-/** Returns true if the post is visible in public feeds (spec §2.2 Normal state) */
-export const isPubliclyVisible = (status: PostStatus) => status === POST_STATUS.PUBLISHED
-
-/** Returns true if the post is under moderation review */
-export const isUnderReview = (status: PostStatus) => status === POST_STATUS.UNDER_REVIEW
-
-/** Returns true if the post has been deleted (either by author or admin) */
-export const isDeleted = (status: PostStatus) => DELETED_STATUSES.includes(status)

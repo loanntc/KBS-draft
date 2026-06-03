@@ -175,7 +175,7 @@ ALTER TABLE posts DROP COLUMN repost_parent_id;
 
 ALTER TABLE post_image_attachments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "post_image_read" ON post_image_attachments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── post_url_link_attachments ────────────────────────────────────────────────
 -- data-dictionary.md post_url_link_attachments entity
@@ -194,7 +194,7 @@ CREATE INDEX idx_post_url_link_post_id ON post_url_link_attachments(post_id);
 
 ALTER TABLE post_url_link_attachments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "post_url_link_read" ON post_url_link_attachments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── post_youtube_link_attachments ───────────────────────────────────────────
 -- data-dictionary.md post_youtube_link_attachments entity (max 1 per post)
@@ -212,7 +212,7 @@ CREATE INDEX idx_post_youtube_post_id ON post_youtube_link_attachments(post_id);
 
 ALTER TABLE post_youtube_link_attachments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "post_youtube_read" ON post_youtube_link_attachments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── post_repost_attachments ─────────────────────────────────────────────────
 -- data-dictionary.md post_repost_attachments entity (replaces repost_parent_id inline)
@@ -231,7 +231,7 @@ CREATE INDEX idx_post_repost_original_post_id ON post_repost_attachments(origina
 
 ALTER TABLE post_repost_attachments ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "post_repost_read" ON post_repost_attachments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── post_polls + post_poll_options + poll_votes ──────────────────────────────
 -- data-dictionary.md entities (replaces vote_options + vote_records from 001)
@@ -324,13 +324,13 @@ ALTER TABLE post_poll_options  ENABLE ROW LEVEL SECURITY;
 ALTER TABLE poll_votes         ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "post_polls_read"        ON post_polls FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 CREATE POLICY "post_poll_options_read" ON post_poll_options FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 CREATE POLICY "poll_votes_read"        ON poll_votes FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 CREATE POLICY "poll_votes_manage_own"  ON poll_votes FOR ALL
-  USING (voter_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── post_return_rate_attachments + post_return_rate_items ───────────────────
 -- data-dictionary.md entities — PK is return_attachment_id (not attachment_id)
@@ -387,9 +387,9 @@ ALTER TABLE post_return_rate_attachments ENABLE ROW LEVEL SECURITY;
 ALTER TABLE post_return_rate_items       ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "post_return_rate_read" ON post_return_rate_attachments FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 CREATE POLICY "post_return_rate_items_read" ON post_return_rate_items FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 -- ─── score_config ─────────────────────────────────────────────────────────────
 -- data-dictionary.md score_config entity with canonical seed data
@@ -534,15 +534,15 @@ ALTER TABLE post_ai_qa            ENABLE ROW LEVEL SECURITY;
 ALTER TABLE ai_qa_interactions    ENABLE ROW LEVEL SECURITY;
 
 CREATE POLICY "ai_debates_read" ON ai_investment_debates FOR SELECT
-  USING (status IN ('ACTIVE','PAST') AND EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (status IN ('ACTIVE','PAST') AND auth.uid() IS NOT NULL);
 
 CREATE POLICY "debate_votes_read"        ON debate_votes FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 CREATE POLICY "debate_votes_manage_own"  ON debate_votes FOR ALL
-  USING (voter_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);
 
 CREATE POLICY "post_ai_qa_read" ON post_ai_qa FOR SELECT
-  USING (status = 'COMPLETE' AND EXISTS (SELECT 1 FROM community_users cu WHERE cu.user_id = auth.uid()));
+  USING (status = 'COMPLETE' AND auth.uid() IS NOT NULL);
 
 CREATE POLICY "ai_qa_interactions_own" ON ai_qa_interactions FOR ALL
-  USING (user_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
+  USING (auth.uid() IS NOT NULL);

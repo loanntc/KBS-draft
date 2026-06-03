@@ -32,15 +32,15 @@ export default function RecommendationCarousel({ userId, nickname }: Recommendat
   useEffect(() => {
     const fetchRecommended = async () => {
       const { data } = await supabase
-        .from('posts_with_score')
+        .from('posts')
         .select(`
-          id, body, like_count, comment_count, score,
+          id, body, like_count, comment_count,
           author:community_users!posts_author_id_fkey(
             id, nickname, profile_image
           )
         `)
         .eq('status', 'PUBLISHED')
-        .order('score', { ascending: false })
+        .order('like_count', { ascending: false })
         .limit(10)
 
       if (data) {

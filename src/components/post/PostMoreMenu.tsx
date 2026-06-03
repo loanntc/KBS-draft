@@ -32,13 +32,11 @@ export default function PostMoreMenu({ post, isOwn, currentUserId, onClose, onDe
   const supabase = createClient()
 
   // ── Delete (FR-11.8) ──────────────────────────────────────────────────────
+  // BE §2.2: author can delete from any state (Normal / Hidden / Draft)
+  // Deletion sets is_deleted=true — never changes status field
   const handleDelete = async () => {
-    if (post.status === 'UNDER_REVIEW') {
-      toast.error('검토 중인 게시글은 삭제할 수 없어요.')
-      onClose(); return
-    }
     const { error } = await supabase.from('posts')
-      .update({ status: 'DELETED_BY_AUTHOR' }).eq('id', post.id)
+      .update({ is_deleted: true }).eq('id', post.id)
     if (!error) {
       onDelete(post.id)
       toast.success('게시글이 삭제되었어요.')
@@ -57,14 +55,14 @@ export default function PostMoreMenu({ post, isOwn, currentUserId, onClose, onDe
     onClose()
   }
 
-  // ── Block author (FR-13.3 + BR-12) ───────────────────────────────────────
+  // ── Block author (FR-13.3 + BR-20) ───────────────────────────────────────
   const handleBlock = async () => {
     await supabase.from('blocks')
       .insert({ blocker_id: currentUserId, blocked_id: post.author?.id })
-    // BR-12: auto-unfollow on block
+    // BR-20: auto-unfollow on block
     await supabase.from('follows').delete()
       .eq('follower_id', currentUserId).eq('followee_id', post.author?.id)
-    toast.success(`${post.author?.nickname}님을 차단했어요.`)
+    toast.success(`${post.author?.nickname}님을 차단했어요. 차단하면 서로의 글을 볼 수 없어요.`)
     onDelete(post.id)
     onClose()
   }

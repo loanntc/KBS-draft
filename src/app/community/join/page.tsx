@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { Check, Camera, ImageIcon, Shuffle, ChevronRight, X } from 'lucide-react'
+import { Check, Camera, ImageIcon, Shuffle, ChevronRight, X, Loader2 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { cn, validateNickname } from '@/lib/utils'
 
@@ -25,11 +25,53 @@ interface TermsState {
   marketingConsent: boolean
 }
 
+// Resize image file to a square data URL (max 300×300, JPEG 0.85)
+function resizeImage(file: File, size = 300): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const img = new Image()
+      img.onload = () => {
+        const canvas = document.createElement('canvas')
+        canvas.width = size
+        canvas.height = size
+        const ctx = canvas.getContext('2d')!
+        // Center-crop to square
+        const min = Math.min(img.width, img.height)
+        const sx = (img.width - min) / 2
+        const sy = (img.height - min) / 2
+        ctx.drawImage(img, sx, sy, min, min, 0, 0, size, size)
+        resolve(canvas.toDataURL('image/jpeg', 0.85))
+      }
+      img.onerror = reject
+      img.src = e.target?.result as string
+    }
+    reader.onerror = reject
+    reader.readAsDataURL(file)
+  })
+}
+
 export default function JoinPage() {
   const router = useRouter()
   const supabase = createClient()
 
   const [step, setStep] = useState<Step>('terms')
+  const [alreadyMember, setAlreadyMember] = useState(false)
+
+  // ── Check if already a member on mount ────────────────────────────────────
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data: { user } }) => {
+      if (!user) return
+      supabase
+        .from('community_users')
+        .select('id, is_member')
+        .eq('auth_user_id', user.id)
+        .maybeSingle()
+        .then(({ data }) => {
+          if (data?.is_member) setAlreadyMember(true)
+        })
+    })
+  }, [supabase])
 
   // ── Terms state ────────────────────────────────────────────────────────────
   const [terms, setTerms] = useState<TermsState>({
@@ -44,21 +86,15 @@ export default function JoinPage() {
 
   const handleSelectAll = () => {
     const next = !allChecked
-    setTerms({
-      termsService: next,
-      privacyConsent: next,
-      notificationConsent: next,
-      marketingConsent: next,
-    })
+    setTerms({ termsService: next, privacyConsent: next, notificationConsent: next, marketingConsent: next })
   }
 
-  const toggleTerm = (key: keyof TermsState) => {
-    setTerms((prev) => ({ ...prev, [key]: !prev[key] }))
-  }
+  const toggleTerm = (key: keyof TermsState) => setTerms((prev) => ({ ...prev, [key]: !prev[key] }))
 
   // ── Profile state ──────────────────────────────────────────────────────────
   const [gradientIndex, setGradientIndex] = useState(0)
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null)
+  const [uploadingImage, setUploadingImage] = useState(false)
   const [showPresetGallery, setShowPresetGallery] = useState(false)
   const [nickname, setNickname] = useState('')
   const [nicknameError, setNicknameError] = useState<string | null>(null)
@@ -68,7 +104,27 @@ export default function JoinPage() {
   const [submitError, setSubmitError] = useState<string | null>(null)
 
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement>(null)
+  const albumInputRef = useRef<HTMLInputElement>(null)
 
+  // ── Image pick & resize ────────────────────────────────────────────────────
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setUploadingImage(true)
+    try {
+      const dataUrl = await resizeImage(file)
+      setAvatarUrl(dataUrl)
+    } catch {
+      // silently fall back to gradient
+    } finally {
+      setUploadingImage(false)
+      // Reset input so same file can be picked again
+      e.target.value = ''
+    }
+  }
+
+  // ── Nickname check ─────────────────────────────────────────────────────────
   const checkNickname = useCallback(async (value: string) => {
     const formatError = validateNickname(value)
     if (formatError) {
@@ -108,6 +164,7 @@ export default function JoinPage() {
 
   const canSubmitProfile = nickname.length >= 3 && nicknameAvailable === true && !checking
 
+  // ── Submit ─────────────────────────────────────────────────────────────────
   const handleSubmit = async () => {
     if (!canSubmitProfile || submitting) return
     setSubmitting(true)
@@ -115,16 +172,12 @@ export default function JoinPage() {
 
     try {
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) {
-        router.push('/login?next=/community/join')
-        return
-      }
+      if (!user) { router.push('/login?next=/community/join'); return }
 
       const { error } = await supabase.from('community_users').insert({
         auth_user_id: user.id,
         nickname,
         profile_image: avatarUrl,
-        avatar_gradient: PRESET_GRADIENTS[gradientIndex],
         accepted_terms: {
           termsService: terms.termsService,
           privacyConsent: terms.privacyConsent,
@@ -142,16 +195,40 @@ export default function JoinPage() {
       })
 
       if (error) {
-        setSubmitError('프로필 설정에 실패했어요. 다시 시도해주세요.')
+        console.error('Insert error:', error)
+        setSubmitError(`프로필 설정에 실패했어요: ${error.message}`)
         setSubmitting(false)
         return
       }
 
       router.push('/community')
-    } catch {
+    } catch (err) {
+      console.error(err)
       setSubmitError('오류가 발생했어요. 다시 시도해주세요.')
       setSubmitting(false)
     }
+  }
+
+  // ── Already a member screen ────────────────────────────────────────────────
+  if (alreadyMember) {
+    return (
+      <div className="min-h-screen bg-white flex flex-col items-center justify-center px-8 max-w-[430px] mx-auto text-center">
+        <div className="w-16 h-16 rounded-2xl bg-[#FFD700] flex items-center justify-center mb-5 shadow-md">
+          <span className="text-3xl font-black text-gray-900">M</span>
+        </div>
+        <h2 className="text-xl font-bold text-gray-900 mb-2">이미 가입된 계정이에요</h2>
+        <p className="text-sm text-gray-500 mb-8">
+          이 계정은 이미 M-able 커뮤니티 멤버예요.<br />
+          바로 커뮤니티로 이동할게요.
+        </p>
+        <button
+          onClick={() => { window.location.href = '/community' }}
+          className="w-full py-4 rounded-2xl bg-[#FFD700] text-gray-900 font-bold text-base"
+        >
+          커뮤니티 홈으로 가기
+        </button>
+      </div>
+    )
   }
 
   return (
@@ -161,29 +238,20 @@ export default function JoinPage() {
         {/* ── STEP 1: Terms ── */}
         {step === 'terms' && (
           <div className="flex flex-col flex-1">
-            {/* Header */}
             <div className="px-5 pt-14 pb-8">
               <h1 className="text-2xl font-bold text-gray-900 leading-tight">
-                커뮤니티 서비스<br />
-                이용에 동의해 주세요
+                커뮤니티 서비스<br />이용에 동의해 주세요
               </h1>
               <p className="text-sm text-gray-500 mt-2">
-                M-able 커뮤니티를 시작하기 위해<br />
-                아래 약관에 동의해주세요.
+                M-able 커뮤니티를 시작하기 위해<br />아래 약관에 동의해주세요.
               </p>
             </div>
 
-            {/* Select All */}
             <div className="mx-5 mb-3 rounded-xl bg-gray-50 px-4 py-3">
-              <button
-                onClick={handleSelectAll}
-                className="flex items-center gap-3 w-full"
-              >
+              <button onClick={handleSelectAll} className="flex items-center gap-3 w-full">
                 <div className={cn(
                   'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                  allChecked
-                    ? 'bg-[#FFD700] border-[#FFD700]'
-                    : 'border-gray-300'
+                  allChecked ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'
                 )}>
                   {allChecked && <Check size={12} className="text-white" strokeWidth={3} />}
                 </div>
@@ -193,7 +261,6 @@ export default function JoinPage() {
 
             <div className="mx-5 h-px bg-gray-100 mb-3" />
 
-            {/* Individual Terms */}
             <div className="mx-5 flex flex-col gap-3">
               {[
                 { key: 'termsService' as keyof TermsState, label: '커뮤니티 서비스 이용 약관', required: true },
@@ -202,47 +269,34 @@ export default function JoinPage() {
                 { key: 'marketingConsent' as keyof TermsState, label: '마케팅 정보 수신 동의', required: false },
               ].map(({ key, label, required }) => (
                 <div key={key} className="flex items-center justify-between">
-                  <button
-                    onClick={() => toggleTerm(key)}
-                    className="flex items-center gap-3 flex-1"
-                  >
+                  <button onClick={() => toggleTerm(key)} className="flex items-center gap-3 flex-1">
                     <div className={cn(
                       'w-5 h-5 rounded-full border-2 flex items-center justify-center flex-shrink-0',
-                      terms[key]
-                        ? 'bg-[#FFD700] border-[#FFD700]'
-                        : 'border-gray-300'
+                      terms[key] ? 'bg-[#FFD700] border-[#FFD700]' : 'border-gray-300'
                     )}>
                       {terms[key] && <Check size={12} className="text-white" strokeWidth={3} />}
                     </div>
                     <span className="text-sm text-gray-800">
-                      <span className={cn(
-                        'text-xs font-medium mr-1',
-                        required ? 'text-[#E8003D]' : 'text-gray-400'
-                      )}>
+                      <span className={cn('text-xs font-medium mr-1', required ? 'text-[#E8003D]' : 'text-gray-400')}>
                         [{required ? '필수' : '선택'}]
                       </span>
                       {label}
                     </span>
                   </button>
-                  <button className="p-1 text-gray-400">
-                    <ChevronRight size={16} />
-                  </button>
+                  <button className="p-1 text-gray-400"><ChevronRight size={16} /></button>
                 </div>
               ))}
             </div>
 
             <div className="flex-1" />
 
-            {/* Next Button */}
             <div className="px-5 pb-10 pt-6">
               <button
                 onClick={() => allRequired && setStep('profile')}
                 disabled={!allRequired}
                 className={cn(
                   'w-full py-4 rounded-2xl text-base font-bold transition-all',
-                  allRequired
-                    ? 'bg-[#FFD700] text-gray-900'
-                    : 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                  allRequired ? 'bg-[#FFD700] text-gray-900' : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 )}
               >
                 다음
@@ -254,7 +308,6 @@ export default function JoinPage() {
         {/* ── STEP 2: Profile Setup ── */}
         {step === 'profile' && (
           <div className="flex flex-col flex-1">
-            {/* Header */}
             <div className="flex items-center px-4 pt-12 pb-6">
               <button onClick={() => setStep('terms')} className="p-2 -ml-2 text-gray-700">
                 <X size={20} />
@@ -262,14 +315,16 @@ export default function JoinPage() {
               <h1 className="text-lg font-bold text-gray-900 ml-2">프로필 설정</h1>
             </div>
 
-            {/* Avatar */}
+            {/* Avatar preview */}
             <div className="flex flex-col items-center gap-4 pb-8">
               <div className="relative">
                 <div className={cn(
                   'w-24 h-24 rounded-full overflow-hidden flex items-center justify-center',
                   !avatarUrl && `bg-gradient-to-br ${PRESET_GRADIENTS[gradientIndex]}`
                 )}>
-                  {avatarUrl ? (
+                  {uploadingImage ? (
+                    <Loader2 size={28} className="text-white animate-spin" />
+                  ) : avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img src={avatarUrl} alt="avatar" className="w-full h-full object-cover" />
                   ) : (
@@ -278,23 +333,55 @@ export default function JoinPage() {
                     </span>
                   )}
                 </div>
-                <button
-                  onClick={randomizeGradient}
-                  className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center"
-                >
-                  <Shuffle size={13} className="text-white" />
-                </button>
+                {avatarUrl ? (
+                  <button
+                    onClick={() => setAvatarUrl(null)}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center"
+                  >
+                    <X size={13} className="text-white" />
+                  </button>
+                ) : (
+                  <button
+                    onClick={randomizeGradient}
+                    className="absolute -bottom-1 -right-1 w-7 h-7 bg-gray-800 rounded-full flex items-center justify-center"
+                  >
+                    <Shuffle size={13} className="text-white" />
+                  </button>
+                )}
               </div>
 
-              {/* Avatar options */}
+              {/* Hidden file inputs */}
+              <input
+                ref={cameraInputRef}
+                type="file"
+                accept="image/*"
+                capture="user"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+              <input
+                ref={albumInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={handleFileChange}
+              />
+
+              {/* Avatar action buttons */}
               <div className="flex gap-4">
-                <button className="flex flex-col items-center gap-1 text-xs text-gray-600">
+                <button
+                  onClick={() => cameraInputRef.current?.click()}
+                  className="flex flex-col items-center gap-1 text-xs text-gray-600"
+                >
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                     <Camera size={18} className="text-gray-600" />
                   </div>
                   <span>카메라</span>
                 </button>
-                <button className="flex flex-col items-center gap-1 text-xs text-gray-600">
+                <button
+                  onClick={() => albumInputRef.current?.click()}
+                  className="flex flex-col items-center gap-1 text-xs text-gray-600"
+                >
                   <div className="w-10 h-10 rounded-full bg-gray-100 flex items-center justify-center">
                     <ImageIcon size={18} className="text-gray-600" />
                   </div>
@@ -314,7 +401,6 @@ export default function JoinPage() {
                 </button>
               </div>
 
-              {/* Preset gallery */}
               {showPresetGallery && (
                 <div className="flex gap-3 px-5">
                   {PRESET_GRADIENTS.map((gradient, i) => (
@@ -332,7 +418,7 @@ export default function JoinPage() {
               )}
             </div>
 
-            {/* Nickname input */}
+            {/* Nickname */}
             <div className="px-5">
               <label className="text-sm font-semibold text-gray-700 block mb-2">닉네임</label>
               <div className="relative">
@@ -356,21 +442,13 @@ export default function JoinPage() {
                 </span>
               </div>
 
-              {/* Feedback messages */}
               <div className="mt-1.5 min-h-[20px]">
-                {checking && (
-                  <p className="text-xs text-gray-400">확인 중...</p>
-                )}
-                {!checking && nicknameError && (
-                  <p className="text-xs text-red-500">{nicknameError}</p>
-                )}
+                {checking && <p className="text-xs text-gray-400">확인 중...</p>}
+                {!checking && nicknameError && <p className="text-xs text-red-500">{nicknameError}</p>}
                 {!checking && nicknameAvailable === true && !nicknameError && (
                   <p className="text-xs text-green-600">사용 가능한 닉네임이에요.</p>
                 )}
-                {!nicknameError && !nicknameAvailable && !checking && nickname.length > 0 && (
-                  <p className="text-xs text-gray-400">한글·영문 소문자·숫자 3~10자</p>
-                )}
-                {nickname.length === 0 && (
+                {!nicknameError && !nicknameAvailable && !checking && (
                   <p className="text-xs text-gray-400">한글·영문 소문자·숫자 3~10자</p>
                 )}
               </div>
@@ -382,19 +460,23 @@ export default function JoinPage() {
 
             <div className="flex-1" />
 
-            {/* Submit Button */}
             <div className="px-5 pb-10 pt-6">
               <button
                 onClick={handleSubmit}
-                disabled={!canSubmitProfile || submitting}
+                disabled={!canSubmitProfile || submitting || uploadingImage}
                 className={cn(
                   'w-full py-4 rounded-2xl text-base font-bold transition-all',
-                  canSubmitProfile && !submitting
+                  canSubmitProfile && !submitting && !uploadingImage
                     ? 'bg-[#FFD700] text-gray-900'
                     : 'bg-gray-100 text-gray-400 cursor-not-allowed'
                 )}
               >
-                {submitting ? '설정 중...' : '커뮤니티 시작하기'}
+                {submitting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    설정 중...
+                  </span>
+                ) : '커뮤니티 시작하기'}
               </button>
             </div>
           </div>

@@ -84,7 +84,7 @@ export default function ExpertClient({ currentUserId, experts, top5, initialFoll
   }
 
   return (
-    <div className="min-h-screen bg-white max-w-[430px] mx-auto">
+    <div className="bg-white">
 
       {/* ── Expert strip (horizontal scroll) ── */}
       {experts.length > 0 && (

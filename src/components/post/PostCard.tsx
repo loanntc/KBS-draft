@@ -24,19 +24,22 @@ export default function PostCard({ post, currentUserId, onUpdate, onDelete }: Po
   const isOwn = post.author?.id === currentUserId
   const supabase = createClient()
 
-  // ── DELETED placeholder ──────────────────────────────────────────────────
-  if (post.status === 'DELETED_BY_AUTHOR' || post.status === 'DELETED_BY_ADMIN') {
+  // ── DELETED placeholder (BE §2.2: is_deleted=true) ──────────────────────
+  if (post.is_deleted) {
     return (
       <div className="post-card text-center text-gray-400 text-sm py-6">
-        {post.status === 'DELETED_BY_AUTHOR'
-          ? '삭제된 게시글입니다.'
-          : '운영 정책에 의해 삭제된 게시글입니다.'}
+        삭제된 게시글입니다.
       </div>
     )
   }
 
   // ── LIKE handler ─────────────────────────────────────────────────────────
   const handleLike = async () => {
+    // BR-17: author cannot like their own post
+    if (isOwn) {
+      toast.error('내 게시글에는 좋아요를 할 수 없어요.')
+      return
+    }
     const optimistic = { ...post, isLiked: !post.isLiked, likeCount: post.isLiked ? post.likeCount - 1 : post.likeCount + 1 }
     onUpdate(optimistic)
     try {
@@ -129,13 +132,16 @@ export default function PostCard({ post, currentUserId, onUpdate, onDelete }: Po
         </div>
       )}
 
-      {/* ── Post body (max 5 lines) ── */}
+      {/* ── Post body (max 10 lines — CR-41) ── */}
       {post.body && (
         <div className="mb-3">
-          <p className={cn('text-sm text-gray-800 leading-relaxed whitespace-pre-wrap', !showFullBody && 'line-clamp-5')}>
+          <p className={cn('text-sm text-gray-800 leading-relaxed whitespace-pre-wrap', !showFullBody && 'line-clamp-10')}>
             {post.body}
           </p>
-          {!showFullBody && post.body.split('\n').length > 5 && (
+          {/* CR-41: 더보기 when body > 10 lines OR 2+ attachment types (CR-41b) */}
+          {!showFullBody && (
+            post.body.split('\n').length > 10 || post.has_multiple_attachments
+          ) && (
             <button onClick={() => setShowFullBody(true)} className="text-xs text-gray-500 mt-1">더보기</button>
           )}
           {post.isEdited && <span className="text-[10px] text-gray-400 ml-1">(수정됨)</span>}
@@ -156,8 +162,8 @@ export default function PostCard({ post, currentUserId, onUpdate, onDelete }: Po
         </div>
       )}
 
-      {/* ── Under Review label (own post only) ── */}
-      {post.status === 'UNDER_REVIEW' && isOwn && (
+      {/* ── Hidden (Under Review) label — own post only (BE §2.2: status=HIDDEN) ── */}
+      {post.status === 'HIDDEN' && isOwn && (
         <div className="mb-2">
           <span className="text-xs font-medium text-orange-600 bg-orange-50 px-2 py-1 rounded">검토중</span>
         </div>
@@ -179,14 +185,14 @@ export default function PostCard({ post, currentUserId, onUpdate, onDelete }: Po
             <span>{post.commentCount > 0 ? post.commentCount : ''}</span>
           </Link>
 
-          {post.status !== 'UNDER_REVIEW' && (
+          {post.status !== 'HIDDEN' && (
             <Link href={`/community?repost=${post.id}`} className="flex items-center gap-1.5 text-xs text-gray-500">
               <Repeat2 size={18} />
               <span>{post.repostCount > 0 ? post.repostCount : ''}</span>
             </Link>
           )}
 
-          {post.status !== 'UNDER_REVIEW' && (
+          {post.status !== 'HIDDEN' && (
             <button onClick={handleShare} className="flex items-center gap-1.5 text-xs text-gray-500">
               <Share2 size={18} />
             </button>
