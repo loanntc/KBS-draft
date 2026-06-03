@@ -10,6 +10,8 @@
 ALTER TABLE posts           RENAME TO community_posts;
 
 -- community_users: keep as-is (confirmed table name)
+-- Rename avatar_url → profile_image (FE convention)
+ALTER TABLE community_users RENAME COLUMN avatar_url TO profile_image;
 
 -- likes → post_likes (data-dictionary.md Entity: post_likes)
 ALTER TABLE likes   RENAME TO post_likes;
