@@ -9,8 +9,7 @@
 -- posts → community_posts (data-dictionary.md Entity: community_posts)
 ALTER TABLE posts           RENAME TO community_posts;
 
--- community_users → community_members (data-dictionary.md Entity: community_members)
-ALTER TABLE community_users RENAME TO community_members;
+-- community_users: keep as-is (confirmed table name)
 
 -- likes → post_likes (data-dictionary.md Entity: post_likes)
 ALTER TABLE likes   RENAME TO post_likes;
@@ -29,12 +28,7 @@ ALTER INDEX idx_posts_created_at        RENAME TO idx_community_posts_created_at
 ALTER INDEX idx_posts_is_deleted        RENAME TO idx_community_posts_is_deleted;
 ALTER INDEX idx_posts_popularity_score  RENAME TO idx_community_posts_popularity_score;
 
-ALTER INDEX idx_community_users_nickname      RENAME TO idx_community_members_nickname;
-ALTER INDEX idx_community_users_user_id       RENAME TO idx_community_members_user_id;
-ALTER INDEX idx_community_users_is_expert     RENAME TO idx_community_members_is_expert;
-ALTER INDEX idx_community_users_account_type  RENAME TO idx_community_members_account_type;
-ALTER INDEX idx_community_users_account_subtype RENAME TO idx_community_members_account_subtype;
-ALTER INDEX idx_community_users_feed_visibility RENAME TO idx_community_members_feed_visibility;
+-- community_users indexes keep their names (no rename)
 
 ALTER INDEX idx_likes_post_id    RENAME TO idx_post_likes_post_id;
 ALTER INDEX idx_likes_comment_id RENAME TO idx_post_likes_comment_id;
@@ -166,14 +160,14 @@ CREATE OR REPLACE FUNCTION update_post_count()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' AND NEW.status = 'PUBLISHED' AND NEW.is_deleted = FALSE THEN
-    UPDATE community_members SET post_count = post_count + 1 WHERE id = NEW.author_id;
+    UPDATE community_users SET post_count = post_count + 1 WHERE id = NEW.author_id;
   ELSIF TG_OP = 'UPDATE' THEN
     IF (OLD.status = 'PUBLISHED' AND OLD.is_deleted = FALSE)
        AND (NEW.status != 'PUBLISHED' OR NEW.is_deleted = TRUE) THEN
-      UPDATE community_members SET post_count = GREATEST(0, post_count - 1) WHERE id = NEW.author_id;
+      UPDATE community_users SET post_count = GREATEST(0, post_count - 1) WHERE id = NEW.author_id;
     ELSIF (OLD.status != 'PUBLISHED' OR OLD.is_deleted = TRUE)
           AND (NEW.status = 'PUBLISHED' AND NEW.is_deleted = FALSE) THEN
-      UPDATE community_members SET post_count = post_count + 1 WHERE id = NEW.author_id;
+      UPDATE community_users SET post_count = post_count + 1 WHERE id = NEW.author_id;
     END IF;
   END IF;
   RETURN NULL;
@@ -184,11 +178,11 @@ CREATE OR REPLACE FUNCTION update_follow_counts()
 RETURNS TRIGGER AS $$
 BEGIN
   IF TG_OP = 'INSERT' THEN
-    UPDATE community_members SET following_count = following_count + 1 WHERE id = NEW.follower_id;
-    UPDATE community_members SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
+    UPDATE community_users SET following_count = following_count + 1 WHERE id = NEW.follower_id;
+    UPDATE community_users SET follower_count  = follower_count  + 1 WHERE id = NEW.followee_id;
   ELSIF TG_OP = 'DELETE' THEN
-    UPDATE community_members SET following_count = GREATEST(0, following_count - 1) WHERE id = OLD.follower_id;
-    UPDATE community_members SET follower_count  = GREATEST(0, follower_count  - 1) WHERE id = OLD.followee_id;
+    UPDATE community_users SET following_count = GREATEST(0, following_count - 1) WHERE id = OLD.follower_id;
+    UPDATE community_users SET follower_count  = GREATEST(0, follower_count  - 1) WHERE id = OLD.followee_id;
   END IF;
   RETURN NULL;
 END;
@@ -206,78 +200,38 @@ CREATE POLICY "community_posts_read_public" ON community_posts FOR SELECT
   USING (
     status = 'PUBLISHED'
     AND is_deleted = FALSE
-    AND EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid())
+    AND EXISTS (SELECT 1 FROM community_users cm WHERE cm.user_id = auth.uid())
   );
 
 -- Author view: own posts including HIDDEN (m03 §2.2 — Hidden posts visible to author in MY feed)
 CREATE POLICY "community_posts_read_own" ON community_posts FOR SELECT
   USING (
-    author_id = (SELECT id FROM community_members WHERE user_id = auth.uid())
+    author_id = (SELECT id FROM community_users WHERE user_id = auth.uid())
     AND is_deleted = FALSE
   );
 
--- Update post_reports policy to reference community_members
+-- Update post_reports policy to reference community_users
 DROP POLICY IF EXISTS "reports_insert" ON post_reports;
 CREATE POLICY "post_reports_insert" ON post_reports FOR INSERT
-  WITH CHECK (reporter_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+  WITH CHECK (reporter_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
 
 -- Update follows policies
 DROP POLICY IF EXISTS "follows_read"        ON follows;
 DROP POLICY IF EXISTS "follows_manage_own"  ON follows;
 CREATE POLICY "follows_read"       ON follows FOR SELECT
-  USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
+  USING (EXISTS (SELECT 1 FROM community_users cm WHERE cm.user_id = auth.uid()));
 CREATE POLICY "follows_manage_own" ON follows FOR ALL
-  USING (follower_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+  USING (follower_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
 
 -- Update blocks policies
 DROP POLICY IF EXISTS "blocks_manage_own" ON blocks;
 CREATE POLICY "blocks_manage_own" ON blocks FOR ALL
-  USING (blocker_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+  USING (blocker_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
 
 -- Update notifications policies
 DROP POLICY IF EXISTS "notifications_own" ON notifications;
 CREATE POLICY "notifications_own" ON notifications FOR ALL
-  USING (recipient_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+  USING (recipient_id = (SELECT id FROM community_users WHERE user_id = auth.uid()));
 
--- ─── 9. Upgrade RLS policies created in 002 (replace auth.uid() IS NOT NULL stubs)
--- 002 used simplified policies to avoid forward-referencing community_members before rename.
--- Now that community_members exists, upgrade to proper member-check policies.
-
--- Attachment tables
-DROP POLICY IF EXISTS "post_image_read"             ON post_image_attachments;
-DROP POLICY IF EXISTS "post_url_link_read"          ON post_url_link_attachments;
-DROP POLICY IF EXISTS "post_youtube_read"           ON post_youtube_link_attachments;
-DROP POLICY IF EXISTS "post_repost_read"            ON post_repost_attachments;
-DROP POLICY IF EXISTS "post_return_rate_read"       ON post_return_rate_attachments;
-DROP POLICY IF EXISTS "post_return_rate_items_read" ON post_return_rate_items;
-
-CREATE POLICY "post_image_read"             ON post_image_attachments         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_url_link_read"          ON post_url_link_attachments       FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_youtube_read"           ON post_youtube_link_attachments   FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_repost_read"            ON post_repost_attachments         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_return_rate_read"       ON post_return_rate_attachments    FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_return_rate_items_read" ON post_return_rate_items          FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-
--- Poll tables
-DROP POLICY IF EXISTS "post_polls_read"        ON post_polls;
-DROP POLICY IF EXISTS "post_poll_options_read" ON post_poll_options;
-DROP POLICY IF EXISTS "poll_votes_read"        ON poll_votes;
-DROP POLICY IF EXISTS "poll_votes_manage_own"  ON poll_votes;
-
-CREATE POLICY "post_polls_read"        ON post_polls        FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "post_poll_options_read" ON post_poll_options  FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "poll_votes_read"        ON poll_votes         FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "poll_votes_manage_own"  ON poll_votes         FOR ALL    USING (voter_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
-
--- AI tables
-DROP POLICY IF EXISTS "ai_debates_read"        ON ai_investment_debates;
-DROP POLICY IF EXISTS "debate_votes_read"       ON debate_votes;
-DROP POLICY IF EXISTS "debate_votes_manage_own" ON debate_votes;
-DROP POLICY IF EXISTS "post_ai_qa_read"         ON post_ai_qa;
-DROP POLICY IF EXISTS "ai_qa_interactions_own"  ON ai_qa_interactions;
-
-CREATE POLICY "ai_debates_read"        ON ai_investment_debates FOR SELECT USING (status IN ('ACTIVE','PAST') AND EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "debate_votes_read"      ON debate_votes          FOR SELECT USING (EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "debate_votes_manage_own" ON debate_votes         FOR ALL    USING (voter_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
-CREATE POLICY "post_ai_qa_read"        ON post_ai_qa            FOR SELECT USING (status = 'COMPLETE' AND EXISTS (SELECT 1 FROM community_members cm WHERE cm.user_id = auth.uid()));
-CREATE POLICY "ai_qa_interactions_own" ON ai_qa_interactions    FOR ALL    USING (user_id = (SELECT id FROM community_members WHERE user_id = auth.uid()));
+-- ─── 9. Note: RLS policies for tables created in 002 already reference
+-- community_users directly — no upgrade needed here (table name unchanged).

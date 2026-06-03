@@ -13,7 +13,7 @@ import { Post, mapPost } from '@/types'
 interface FollowUser {
   id: string
   nickname: string
-  profile_image: string | null
+  avatar_url: string | null
   follower_count: number
   post_count: number
 }
@@ -68,7 +68,7 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
       .from('community_posts')
       .select(`
         *,
-        author:community_members!community_posts_author_id_fkey(
+        author:community_users!community_posts_author_id_fkey(
           id, user_id, nickname, avatar_url, bio,
           is_expert, account_type, account_badge, post_count, follower_count, following_count,
           feed_visibility, holdings_public, performance_public, scrap_public,
@@ -138,9 +138,9 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
                 >
                   <div className="relative">
                     <div className="w-12 h-12 rounded-full bg-gray-200 overflow-hidden">
-                      {followee.profile_image ? (
+                      {followee.avatar_url ? (
                         <Image
-                          src={followee.profile_image}
+                          src={followee.avatar_url}
                           alt={followee.nickname}
                           width={48}
                           height={48}
@@ -180,8 +180,8 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
 
               {/* Avatar */}
               <div className="w-9 h-9 rounded-full bg-gray-200 overflow-hidden flex-shrink-0">
-                {u.profile_image ? (
-                  <Image src={u.profile_image} alt={u.nickname} width={36} height={36} className="w-full h-full object-cover" />
+                {u.avatar_url ? (
+                  <Image src={u.avatar_url} alt={u.nickname} width={36} height={36} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full bg-gradient-to-br from-yellow-400 to-orange-500 flex items-center justify-center text-xs font-bold text-white">
                     {u.nickname[0]?.toUpperCase()}

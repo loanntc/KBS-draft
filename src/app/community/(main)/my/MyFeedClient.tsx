@@ -52,7 +52,7 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
       .from('community_posts')
       .select(`
         *,
-        author:community_members!community_posts_author_id_fkey(
+        author:community_users!community_posts_author_id_fkey(
           id, user_id, nickname, avatar_url, bio,
           is_expert, account_type, account_badge, post_count, follower_count, following_count,
           feed_visibility, holdings_public, performance_public, scrap_public,
@@ -87,7 +87,7 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
         post_id,
         post:community_posts!post_scraps_post_id_fkey(
           *,
-          author:community_members!community_posts_author_id_fkey(
+          author:community_users!community_posts_author_id_fkey(
             id, user_id, nickname, avatar_url, bio,
             is_expert, account_type, account_badge, post_count, follower_count, following_count,
             feed_visibility, holdings_public, performance_public, scrap_public,
@@ -145,9 +145,9 @@ export default function MyFeedClient({ communityUser }: MyFeedClientProps) {
         <div className="flex items-start justify-between">
           <Link href="/community/settings/profile" className="relative">
             <div className="w-16 h-16 rounded-full bg-gray-200 overflow-hidden">
-              {communityUser.profile_image ? (
+              {communityUser.avatar_url ? (
                 <Image
-                  src={communityUser.profile_image}
+                  src={communityUser.avatar_url}
                   alt={communityUser.nickname}
                   width={64}
                   height={64}

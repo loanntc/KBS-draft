@@ -31,7 +31,7 @@ export default function HomeFeed({ currentUserId }: HomeFeedProps) {
       .from('community_posts')
       .select(`
         *,
-        author:community_members!community_posts_author_id_fkey(
+        author:community_users!community_posts_author_id_fkey(
           id, user_id, nickname, avatar_url, bio,
           is_expert, account_type, account_badge, post_count, follower_count, following_count,
           feed_visibility, holdings_public, performance_public, scrap_public,
