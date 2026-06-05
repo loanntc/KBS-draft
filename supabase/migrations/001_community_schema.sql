@@ -3,8 +3,7 @@
 -- Based on FRD/SRD v1.1
 -- ─────────────────────────────────────────────────────────────────────────────
 
--- Enable UUID extension
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+-- Enable BIGINT extension
 CREATE EXTENSION IF NOT EXISTS "pg_trgm";
 
 -- ─── Enums ───────────────────────────────────────────────────────────────────
@@ -49,8 +48,8 @@ CREATE TYPE report_category AS ENUM (
 -- ─── Community Users ─────────────────────────────────────────────────────────
 
 CREATE TABLE community_users (
-  id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id         UUID NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
+  id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id         BIGINT NOT NULL UNIQUE REFERENCES auth.users(id) ON DELETE CASCADE,
   nickname        VARCHAR(10) NOT NULL UNIQUE,
   avatar_url      TEXT,
   bio             VARCHAR(100),
@@ -87,15 +86,15 @@ CREATE INDEX idx_community_users_is_expert ON community_users(is_expert) WHERE i
 -- ─── Posts ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE posts (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  author_id         UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  author_id         BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   type              post_type NOT NULL,
   status            post_status NOT NULL DEFAULT 'PUBLISHED',
   body              TEXT,
   images            TEXT[],                  -- Type 2: IMAGE
   link_url          TEXT,                    -- Type 5: LINK
   link_meta         JSONB,                   -- { title, description, imageUrl, url }
-  repost_parent_id  UUID REFERENCES posts(id) ON DELETE SET NULL, -- Type 6
+  repost_parent_id  BIGINT REFERENCES posts(id) ON DELETE SET NULL, -- Type 6
   -- Interaction counts (denormalised for performance)
   like_count        INTEGER NOT NULL DEFAULT 0,
   comment_count     INTEGER NOT NULL DEFAULT 0,
@@ -139,8 +138,8 @@ WHERE p.status = 'PUBLISHED';
 -- ─── Topic Tags ──────────────────────────────────────────────────────────────
 
 CREATE TABLE post_topic_tags (
-  id        UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id   UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id        BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id   BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   tag_type  VARCHAR(10) NOT NULL CHECK (tag_type IN ('stock', 'theme')),
   value     VARCHAR(100) NOT NULL,
   display_name VARCHAR(100) NOT NULL
@@ -152,8 +151,8 @@ CREATE INDEX idx_post_topic_tags_value ON post_topic_tags(value);
 -- ─── AI Hashtags ─────────────────────────────────────────────────────────────
 
 CREATE TABLE post_ai_hashtags (
-  id      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   tag     VARCHAR(100) NOT NULL
 );
 
@@ -163,8 +162,8 @@ CREATE INDEX idx_post_ai_hashtags_tag ON post_ai_hashtags(tag);
 -- ─── Vote Options (Type 3) ───────────────────────────────────────────────────
 
 CREATE TABLE vote_options (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   label      VARCHAR(20) NOT NULL,
   vote_count INTEGER NOT NULL DEFAULT 0,
   sort_order INTEGER NOT NULL DEFAULT 0
@@ -173,10 +172,10 @@ CREATE TABLE vote_options (
 CREATE INDEX idx_vote_options_post_id ON vote_options(post_id);
 
 CREATE TABLE vote_records (
-  id             UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id        UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  option_id      UUID NOT NULL REFERENCES vote_options(id) ON DELETE CASCADE,
-  voter_id       UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id             BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id        BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  option_id      BIGINT NOT NULL REFERENCES vote_options(id) ON DELETE CASCADE,
+  voter_id       BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (post_id, voter_id)  -- BR-16: one vote per user per post
 );
@@ -184,8 +183,8 @@ CREATE TABLE vote_records (
 -- ─── Profit Rate Items (Type 4) ──────────────────────────────────────────────
 
 CREATE TABLE profit_rate_items (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id           UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id           BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   stock_code        VARCHAR(20) NOT NULL,
   stock_name        VARCHAR(100) NOT NULL,
   logo_url          TEXT,
@@ -201,10 +200,10 @@ CREATE INDEX idx_profit_rate_items_post_id ON profit_rate_items(post_id);
 -- ─── Comments ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE comments (
-  id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id           UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
-  author_id         UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  parent_comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+  id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id           BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  author_id         BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  parent_comment_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
   body              TEXT NOT NULL,
   is_deleted        BOOLEAN NOT NULL DEFAULT FALSE,  -- FR-11.2.1: soft delete
   like_count        INTEGER NOT NULL DEFAULT 0,
@@ -220,10 +219,10 @@ CREATE INDEX idx_comments_created_at ON comments(created_at DESC);
 -- ─── Likes ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE likes (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id    UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  post_id    UUID REFERENCES posts(id) ON DELETE CASCADE,
-  comment_id UUID REFERENCES comments(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  post_id    BIGINT REFERENCES posts(id) ON DELETE CASCADE,
+  comment_id BIGINT REFERENCES comments(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, post_id),
   UNIQUE (user_id, comment_id),
@@ -240,9 +239,9 @@ CREATE INDEX idx_likes_user_id ON likes(user_id);
 -- ─── Scraps ───────────────────────────────────────────────────────────────────
 
 CREATE TABLE scraps (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id    UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, post_id)
 );
@@ -253,9 +252,9 @@ CREATE INDEX idx_scraps_post_id ON scraps(post_id);
 -- ─── Hidden Posts (FR-11.7) ──────────────────────────────────────────────────
 
 CREATE TABLE hidden_posts (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id    UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id    BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (user_id, post_id)
 );
@@ -265,9 +264,9 @@ CREATE INDEX idx_hidden_posts_user_id ON hidden_posts(user_id);
 -- ─── Reports ─────────────────────────────────────────────────────────────────
 
 CREATE TABLE reports (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  reporter_id UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  post_id    UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  reporter_id BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  post_id    BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   category   report_category NOT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (reporter_id, post_id)  -- BR-07: deduplication
@@ -294,9 +293,9 @@ FOR EACH ROW EXECUTE FUNCTION check_report_threshold();
 -- ─── Follow Relationships ─────────────────────────────────────────────────────
 
 CREATE TABLE follows (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  follower_id  UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  followee_id  UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  follower_id  BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  followee_id  BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   bell_enabled BOOLEAN NOT NULL DEFAULT FALSE,  -- FR-13.2: default OFF
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (follower_id, followee_id),
@@ -309,9 +308,9 @@ CREATE INDEX idx_follows_followee_id ON follows(followee_id);
 -- ─── Block Relationships ─────────────────────────────────────────────────────
 
 CREATE TABLE blocks (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  blocker_id UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  blocked_id UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  blocker_id BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  blocked_id BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (blocker_id, blocked_id),
   CHECK (blocker_id != blocked_id)
@@ -323,12 +322,12 @@ CREATE INDEX idx_blocks_blocked_id ON blocks(blocked_id);
 -- ─── Notifications ───────────────────────────────────────────────────────────
 
 CREATE TABLE notifications (
-  id           UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  recipient_id UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  recipient_id BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   type         notification_type NOT NULL,
-  actor_id     UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
-  post_id      UUID REFERENCES posts(id) ON DELETE SET NULL,
-  comment_id   UUID REFERENCES comments(id) ON DELETE SET NULL,
+  actor_id     BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  post_id      BIGINT REFERENCES posts(id) ON DELETE SET NULL,
+  comment_id   BIGINT REFERENCES comments(id) ON DELETE SET NULL,
   is_read      BOOLEAN NOT NULL DEFAULT FALSE,
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );

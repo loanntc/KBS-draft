@@ -8,7 +8,7 @@ import SortToggle from '@/components/ui/SortToggle'
 import { Post, SortMode, mapPost } from '@/types'
 
 interface HomeFeedProps {
-  currentUserId: string
+  currentUserId: number
 }
 
 const PAGE_SIZE = 20

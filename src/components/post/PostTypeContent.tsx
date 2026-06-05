@@ -10,7 +10,7 @@ import ExternalLinkWarning from '@/components/ui/ExternalLinkWarning'
 
 interface PostTypeContentProps {
   post: Post
-  currentUserId: string
+  currentUserId: number
 }
 
 export default function PostTypeContent({ post, currentUserId }: PostTypeContentProps) {
@@ -57,7 +57,7 @@ function ImageContent({ post }: { post: Post }) {
 // vote_options is JSONB array in posts table
 // vote_records stores user votes: user_id + option_index
 
-function VoteContent({ post, currentUserId }: { post: Post; currentUserId: string }) {
+function VoteContent({ post, currentUserId }: { post: Post; currentUserId: number }) {
   const rawOptions = post.voteOptions ?? []
   const [options, setOptions] = useState(rawOptions)
   const [voting, setVoting] = useState(false)

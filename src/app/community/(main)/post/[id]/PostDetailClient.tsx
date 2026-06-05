@@ -8,7 +8,7 @@ import { Post } from '@/types'
 
 interface PostDetailClientProps {
   post: Post
-  currentUserId: string
+  currentUserId: number
 }
 
 export default function PostDetailClient({ post: initialPost, currentUserId }: PostDetailClientProps) {

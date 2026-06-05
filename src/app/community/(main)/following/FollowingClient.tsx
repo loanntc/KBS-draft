@@ -11,7 +11,7 @@ import PostCard from '@/components/post/PostCard'
 import { Post, mapPost } from '@/types'
 
 interface FollowUser {
-  id: string
+  id: number
   nickname: string
   avatar_url: string | null
   follower_count: number
@@ -19,13 +19,13 @@ interface FollowUser {
 }
 
 interface FollowEntry {
-  followee_id: string
+  followee_id: number
   bell_on: boolean
   followee: FollowUser | null
 }
 
 interface FollowingClientProps {
-  currentUserId: string
+  currentUserId: number
   following: FollowEntry[]
   top5: FollowUser[]
 }
@@ -42,7 +42,7 @@ export default function FollowingClient({ currentUserId, following, top5 }: Foll
   const supabase = createClient()
   const [posts, setPosts] = useState<Post[]>([])
   const [loading, setLoading] = useState(true)
-  const [followedIds, setFollowedIds] = useState<Set<string>>(
+  const [followedIds, setFollowedIds] = useState<Set<number>>(
     new Set(following.map((f) => f.followee_id))
   )
 

@@ -8,7 +8,7 @@ export type ThemeCommunityId = 'us-stocks' | 'kr-stocks' | 'asset-growth' | 'pri
 // ─── Auth ────────────────────────────────────────────────────────────────────
 
 export interface AuthUser {
-  id: string
+  id: number
   email?: string
   communityMember: boolean
 }
@@ -17,17 +17,19 @@ export interface AuthUser {
 // Maps to: community_users table
 
 export interface CommunityUser {
-  id: string
+  id: number
   authUserId: string          // DB: auth_user_id
   nickname: string
   profileImage: string | null // DB: profile_image
   bio: string | null
-  isMember: boolean           // DB: is_member
+  isExpert: boolean           // DB: is_expert (legacy)
+  accountType: 'REGULAR' | 'EXPERT' | 'AI_KAY' | null
+  accountBadge: 'VERIFIED' | 'BULB' | 'YOUTUBE' | 'AI' | null
   postCount: number
   followerCount: number
   followingCount: number
   // Privacy
-  feedPublic: boolean
+  feedVisibility: 'PUBLIC' | 'PRIVATE'
   holdingsPublic: boolean
   performancePublic: boolean
   scrapPublic: boolean
@@ -38,7 +40,7 @@ export interface CommunityUser {
   notifCommentMention: boolean
   notifRepost: boolean
   notifNewFollower: boolean
-  notifNewPostBell: boolean   // DB: notif_new_post_bell
+  notifNewPost: boolean       // DB: notif_new_post
   createdAt: string
 }
 
@@ -46,7 +48,7 @@ export interface CommunityUser {
 // Stored as JSONB array in posts.topic_tags
 
 export interface TopicTag {
-  type: 'stock' | 'theme'
+  type: 'STOCK' | 'THEME' | 'DEFAULT' | 'AI_KAY' | 'AI_KAY_TOPIC'
   value: string
   displayName: string
 }
@@ -55,7 +57,7 @@ export interface TopicTag {
 // Stored as JSONB array in posts.vote_options
 
 export interface VoteOption {
-  id: string          // client-generated UUID for keying
+  id: number          // client-generated UUID for keying
   label: string
   voteCount: number
   percentage: number
@@ -90,8 +92,8 @@ export interface LinkMeta {
 // NOTE: vote_options, profit_rate_holdings, topic_tags, ai_hashtags are all JSONB inline
 
 export interface Post {
-  id: string
-  authorId: string            // DB: author_id
+  id: number
+  authorId: number            // DB: author_id
   author: CommunityUser | null
   type: PostType
   status: PostStatus
@@ -104,7 +106,7 @@ export interface Post {
   profitRateHoldings: ProfitRateItem[] | null  // DB: profit_rate_holdings (jsonb)
   linkUrl: string | null               // DB: link_url
   linkMeta: LinkMeta | null            // DB: link_meta (jsonb)
-  repostOf: string | null              // DB: repost_of
+  repostOf: number | null              // DB: repost_of
   repostParent: Post | null            // resolved via join
   topicTags: TopicTag[]                // DB: topic_tags (jsonb)
   aiHashtags: string[]                 // DB: ai_hashtags (jsonb)
@@ -131,9 +133,9 @@ export interface Post {
 // ─── Comment ──────────────────────────────────────────────────────────────────
 
 export interface Comment {
-  id: string
-  postId: string
-  authorId: string
+  id: number
+  postId: number
+  authorId: number
   author: Pick<CommunityUser, 'id' | 'nickname' | 'profileImage'> | null
   body: string
   isDeleted: boolean
@@ -149,13 +151,13 @@ export interface Comment {
 // Maps to: notifications table
 
 export interface Notification {
-  id: string
-  recipientId: string
+  id: number
+  recipientId: number
   type: NotificationType
   senderId: string | null     // DB: sender_id
   sender: Pick<CommunityUser, 'id' | 'nickname' | 'profileImage'> | null
-  postId: string | null
-  commentId: string | null
+  postId: number | null
+  commentId: number | null
   body: string                // DB: body (pre-computed message text)
   isRead: boolean
   createdAt: string
@@ -164,8 +166,8 @@ export interface Notification {
 // ─── Follow / Block ───────────────────────────────────────────────────────────
 
 export interface FollowRelationship {
-  followerId: string
-  followeeId: string
+  followerId: number
+  followeeId: number
   bellOn: boolean             // DB: bell_on
   createdAt: string
 }
@@ -174,8 +176,8 @@ export interface FollowRelationship {
 // Maps to: vote_records table
 
 export interface VoteRecord {
-  id: string
-  postId: string
+  id: number
+  postId: number
   userId: string              // DB: user_id
   optionIndex: number         // DB: option_index
   createdAt: string

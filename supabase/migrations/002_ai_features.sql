@@ -117,7 +117,7 @@ ALTER TABLE posts
   ADD COLUMN popularity_score         DECIMAL(18,4) NOT NULL DEFAULT 0,
   ADD COLUMN ai_hashtag_enabled       BOOLEAN       NOT NULL DEFAULT TRUE,
   ADD COLUMN ai_hashtags              VARCHAR[],
-  ADD COLUMN attachment_order         UUID[],
+  ADD COLUMN attachment_order         BIGINT[],
   ADD COLUMN market_type              VARCHAR(4) CHECK (market_type IN ('US','KR','BOTH')),
   ADD COLUMN content_tier             VARCHAR(6)  CHECK (content_tier IN ('FREE','PAID'));
 
@@ -150,8 +150,8 @@ ALTER TABLE post_topic_tags
 -- 001 stores images as TEXT[] inline on posts — migrate and drop
 
 CREATE TABLE post_image_attachments (
-  attachment_id       UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id             UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  attachment_id       BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id             BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   storage_url         VARCHAR(1000) NOT NULL,
   display_order       INTEGER NOT NULL,
   safety_scan_status  image_scan_status_enum NOT NULL DEFAULT 'PASSED',
@@ -181,8 +181,8 @@ CREATE POLICY "post_image_read" ON post_image_attachments FOR SELECT
 -- data-dictionary.md post_url_link_attachments entity
 
 CREATE TABLE post_url_link_attachments (
-  attachment_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id           UUID NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
+  attachment_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id           BIGINT NOT NULL REFERENCES posts(id) ON DELETE CASCADE,
   original_url      VARCHAR(2000) NOT NULL,
   meta_title        VARCHAR(500),
   meta_description  VARCHAR(1000),
@@ -200,8 +200,8 @@ CREATE POLICY "post_url_link_read" ON post_url_link_attachments FOR SELECT
 -- data-dictionary.md post_youtube_link_attachments entity (max 1 per post)
 
 CREATE TABLE post_youtube_link_attachments (
-  attachment_id  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id        UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
+  attachment_id  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id        BIGINT NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   youtube_url    VARCHAR(500) NOT NULL,
   video_id       VARCHAR(20) NOT NULL,
   thumbnail_url  VARCHAR(500),
@@ -218,9 +218,9 @@ CREATE POLICY "post_youtube_read" ON post_youtube_link_attachments FOR SELECT
 -- data-dictionary.md post_repost_attachments entity (replaces repost_parent_id inline)
 
 CREATE TABLE post_repost_attachments (
-  attachment_id                UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id                      UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
-  original_post_id             UUID NOT NULL REFERENCES posts(id) ON DELETE RESTRICT,
+  attachment_id                BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id                      BIGINT NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
+  original_post_id             BIGINT NOT NULL REFERENCES posts(id) ON DELETE RESTRICT,
   original_author_member_key   VARCHAR(100) NOT NULL,
   original_author_nickname     VARCHAR(100) NOT NULL,
   original_body_snapshot       TEXT NOT NULL
@@ -238,8 +238,8 @@ CREATE POLICY "post_repost_read" ON post_repost_attachments FOR SELECT
 -- 001 has vote_options (post_id FK, no poll entity) — replaced by proper 2-level structure
 
 CREATE TABLE post_polls (
-  poll_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id     UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
+  poll_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id     BIGINT NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   poll_title  VARCHAR(100),
   expires_at  TIMESTAMPTZ NOT NULL,
   total_votes INTEGER NOT NULL DEFAULT 0,
@@ -255,8 +255,8 @@ SELECT DISTINCT post_id, NOW() + INTERVAL '7 days'  -- default expiry for migrat
 FROM vote_options;
 
 CREATE TABLE post_poll_options (
-  option_id     UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  poll_id       UUID NOT NULL REFERENCES post_polls(poll_id) ON DELETE CASCADE,
+  option_id     BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  poll_id       BIGINT NOT NULL REFERENCES post_polls(poll_id) ON DELETE CASCADE,
   label         VARCHAR(20) NOT NULL,
   display_order INTEGER NOT NULL,
   vote_count    INTEGER NOT NULL DEFAULT 0
@@ -272,9 +272,9 @@ JOIN post_polls pp ON pp.post_id = vo.post_id;
 
 -- poll_votes: includes updated_at for vote-change tracking (data-dictionary spec)
 CREATE TABLE poll_votes (
-  poll_id    UUID NOT NULL REFERENCES post_polls(poll_id) ON DELETE CASCADE,
-  option_id  UUID NOT NULL REFERENCES post_poll_options(option_id) ON DELETE CASCADE,
-  voter_id   UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  poll_id    BIGINT NOT NULL REFERENCES post_polls(poll_id) ON DELETE CASCADE,
+  option_id  BIGINT NOT NULL REFERENCES post_poll_options(option_id) ON DELETE CASCADE,
+  voter_id   BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   PRIMARY KEY (poll_id, voter_id)   -- one vote per user per poll; UPDATE on vote change
@@ -336,8 +336,8 @@ CREATE POLICY "poll_votes_manage_own"  ON poll_votes FOR ALL
 -- data-dictionary.md entities — PK is return_attachment_id (not attachment_id)
 
 CREATE TABLE post_return_rate_attachments (
-  return_attachment_id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id              UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
+  return_attachment_id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id              BIGINT NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   snapshot_taken_at    TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -348,8 +348,8 @@ INSERT INTO post_return_rate_attachments (post_id, snapshot_taken_at)
 SELECT DISTINCT post_id, snapshot_at FROM profit_rate_items;
 
 CREATE TABLE post_return_rate_items (
-  item_id              UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  return_attachment_id UUID NOT NULL REFERENCES post_return_rate_attachments(return_attachment_id) ON DELETE CASCADE,
+  item_id              BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  return_attachment_id BIGINT NOT NULL REFERENCES post_return_rate_attachments(return_attachment_id) ON DELETE CASCADE,
   asset_category       asset_category_enum NOT NULL DEFAULT 'STOCK',
   stock_name           VARCHAR(200) NOT NULL,
   ticker               VARCHAR(20),           -- US stocks only; NULL for KR stocks
@@ -412,7 +412,7 @@ INSERT INTO score_config (key, value) VALUES
 -- ─── AI 투자 토론 (Daily Debate) — m02 BE spec §4.5 ──────────────────────────
 
 CREATE TABLE ai_investment_debates (
-  id                      UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  id                      BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   date                    DATE NOT NULL UNIQUE,
   topic                   VARCHAR(100) NOT NULL,
   status                  debate_status_enum NOT NULL DEFAULT 'DRAFT',
@@ -433,7 +433,7 @@ CREATE TABLE ai_investment_debates (
   -- Result
   actual_price_change     DECIMAL(8,4),
   -- Admin
-  approved_by             UUID REFERENCES community_users(id) ON DELETE SET NULL,
+  approved_by             BIGINT REFERENCES community_users(id) ON DELETE SET NULL,
   published_at            TIMESTAMPTZ,
   created_at              TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at              TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -447,9 +447,9 @@ CREATE TRIGGER ai_investment_debates_updated_at
   FOR EACH ROW EXECUTE FUNCTION update_updated_at();
 
 CREATE TABLE debate_votes (
-  id         UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  debate_id  UUID NOT NULL REFERENCES ai_investment_debates(id) ON DELETE CASCADE,
-  voter_id   UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id         BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  debate_id  BIGINT NOT NULL REFERENCES ai_investment_debates(id) ON DELETE CASCADE,
+  voter_id   BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   side       VARCHAR(15) NOT NULL CHECK (side IN ('aggressive_k', 'defensive_k')),
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   UNIQUE (debate_id, voter_id)
@@ -487,8 +487,8 @@ CREATE TRIGGER debate_votes_count_trigger
 -- ─── @케이 Inline Q&A ─────────────────────────────────────────────────────────
 
 CREATE TABLE post_ai_qa (
-  id                  UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  post_id             UUID NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
+  id                  BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  post_id             BIGINT NOT NULL UNIQUE REFERENCES posts(id) ON DELETE CASCADE,
   status              VARCHAR(20) NOT NULL DEFAULT 'PROCESSING'
                         CHECK (status IN ('PROCESSING','COMPLETE','REJECTED')),
   aggressive_brief    JSONB,
@@ -506,8 +506,8 @@ CREATE TRIGGER post_ai_qa_updated_at BEFORE UPDATE ON post_ai_qa FOR EACH ROW EX
 -- ─── Direct AI Q&A Interactions ───────────────────────────────────────────────
 
 CREATE TABLE ai_qa_interactions (
-  id               UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
-  user_id          UUID NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
+  id               BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+  user_id          BIGINT NOT NULL REFERENCES community_users(id) ON DELETE CASCADE,
   question         TEXT NOT NULL,
   status           VARCHAR(20) NOT NULL DEFAULT 'PROCESSING'
                      CHECK (status IN ('PROCESSING','COMPLETE','REJECTED','ERROR')),

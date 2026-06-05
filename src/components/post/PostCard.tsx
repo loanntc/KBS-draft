@@ -13,7 +13,7 @@ import PostMoreMenu from './PostMoreMenu'
 
 interface PostCardProps {
   post: Post
-  currentUserId: string
+  currentUserId: number
   onUpdate: (post: Post) => void
   onDelete: (id: string) => void
 }

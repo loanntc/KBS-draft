@@ -19,7 +19,7 @@ interface ExpertUser {
 }
 
 interface ExpertClientProps {
-  currentUserId: string
+  currentUserId: number
   experts: ExpertUser[]
   top5: ExpertUser[]
   initialFollowedIds: string[]

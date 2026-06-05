@@ -6,8 +6,8 @@ import type { SupabaseClient } from '@supabase/supabase-js'
  */
 export async function getBlockedAuthorIds(
   supabase: SupabaseClient,
-  currentUserId: string
-): Promise<string[]> {
+  currentUserId: number
+): Promise<number[]> {
   const [blockedByMe, blockedMe] = await Promise.all([
     // Users I have blocked
     supabase
@@ -21,7 +21,7 @@ export async function getBlockedAuthorIds(
       .eq('blocked_id', currentUserId),
   ])
 
-  const ids = new Set<string>()
+  const ids = new Set<number>()
   for (const row of blockedByMe.data ?? []) ids.add(row.blocked_id)
   for (const row of blockedMe.data ?? []) ids.add(row.blocker_id)
   return [...ids]
@@ -34,7 +34,7 @@ export async function getBlockedAuthorIds(
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function applyBlockFilter<T extends { not: (...args: any[]) => T }>(
   query: T,
-  blockedIds: string[]
+  blockedIds: number[]
 ): T {
   if (blockedIds.length === 0) return query
   return query.not('author_id', 'in', `(${blockedIds.join(',')})`)

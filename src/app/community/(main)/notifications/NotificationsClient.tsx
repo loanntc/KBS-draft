@@ -27,7 +27,7 @@ interface NotificationRow {
 
 interface NotificationsClientProps {
   notifications: NotificationRow[]
-  currentUserId: string
+  currentUserId: number
 }
 
 const TYPE_LABEL: Record<NotificationType, string> = {

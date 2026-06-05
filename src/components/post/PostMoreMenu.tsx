@@ -9,7 +9,7 @@ import BottomSheet from '@/components/ui/BottomSheet'
 interface PostMoreMenuProps {
   post: Post
   isOwn: boolean
-  currentUserId: string
+  currentUserId: number
   onClose: () => void
   onDelete: (id: string) => void
   onUpdate: (post: Post) => void

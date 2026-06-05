@@ -9,7 +9,7 @@ import { Comment } from '@/types'
 
 interface CommentSectionProps {
   postId: string
-  currentUserId: string
+  currentUserId: number
 }
 
 interface CommentWithReplies extends Comment {

@@ -132,7 +132,7 @@ UPDATE post_reports SET reason = 'PERSONAL_INFO'     WHERE reason::text = 'PRIVA
 UPDATE post_reports SET reason = 'SPAM_REPEAT'       WHERE reason::text = 'FLOOD';
 
 -- Add report_id PK (data-dictionary has explicit report_id)
-ALTER TABLE post_reports ADD COLUMN IF NOT EXISTS report_id UUID DEFAULT uuid_generate_v4();
+ALTER TABLE post_reports ADD COLUMN IF NOT EXISTS report_id BIGINT;
 
 -- ─── 6. Recreate posts_with_score VIEW with new table/column names ────────────
 
